@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watch402 — x402 Bazaar monitor · every PayAI &amp; Coinbase x402 listing checked daily</title>
+<meta name="description" content="Watch402 monitors every x402 listing in the PayAI Network Bazaar and the Coinbase CDP x402 Discovery catalog — nearly 41,000 paid-API endpoints rechecked daily. Catch price drift, wallet swaps and dead endpoints before your buyers do.">
+<link rel="canonical" href="https://watchx402.com/">
+<meta property="og:title" content="Watch402 — x402 Bazaar monitor for PayAI &amp; Coinbase listings">
+<meta property="og:description" content="Watch402 monitors every x402 listing on the PayAI Network Bazaar and Coinbase CDP Discovery, rechecking each against its advertised price, wallet and network. Free monitoring for every listing; Telegram alerts from $5 per 30 days.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://watchx402.com/">
+<meta property="og:image" content="https://watchx402.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://watchx402.com/og.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Watch402",
+  "url": "https://watchx402.com/",
+  "description": "Continuous trust monitor for x402 paid-API listings. Rechecks every listing in the PayAI Network Bazaar and the Coinbase CDP x402 Discovery catalog, diffs live PAYMENT-REQUIRED challenges against advertised terms, and publishes results publicly.",
+  "sameAs": [
+    "https://facilitator.payai.network/discovery/resources",
+    "https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Watch402",
+  "url": "https://watchx402.com/",
+  "applicationCategory": "DeveloperApplication",
+  "description": "Continuous trust monitor for x402 paid-API listings. Rechecks every listing in the PayAI Network Bazaar and the Coinbase CDP x402 Discovery catalog daily, diffs live PAYMENT-REQUIRED challenges against advertised terms, and publishes results publicly.",
+  "operatingSystem": "Web",
+  "offers": [
+    { "@type": "Offer", "name": "x402 monitoring & status pages", "price": "0", "priceCurrency": "USD", "description": "Daily checks, public per-listing status pages and the read API are free for every x402 listing." },
+    { "@type": "Offer", "name": "Telegram alerts", "price": "5.00", "priceCurrency": "USD", "description": "30 days of Telegram alerts for one claimed listing: drift, downtime and recovery. Payable in USDC on Base or natively over x402." }
+  ],
+  "featureList": "daily x402 listing checks, x402 price drift detection, x402 wallet swap detection, Telegram downtime and recovery alerts, claim by wallet signature, native x402 agent subscriptions, public status pages, free JSON API, PayAI Bazaar coverage, Coinbase CDP x402 Discovery coverage"
+}
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext x='0' y='14' font-family='monospace' font-size='14' font-weight='bold'%3E%E2%9A%99%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --surface: #15151a;
+    --border: #2a2a32;
+    --text: #e6e6ec;
+    --muted: #8b8b97;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --blue: #60a5fa;
+    --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: var(--mono); }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  /* header */
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; font-size: 17px; margin-bottom: 64px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* hero */
+  h1 { font-size: 44px; line-height: 1.15; letter-spacing: -0.025em; font-weight: 700; margin: 0 0 20px; }
+  h1 .accent { color: var(--green); }
+  .lede { font-size: 18px; line-height: 1.55; color: var(--muted); margin: 0 0 40px; max-width: 640px; }
+
+  /* live stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 48px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .stat { }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .stat .value { font-family: var(--mono); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+  .stat .value.green { color: var(--green); }
+  .stat .value.red { color: var(--red); }
+  .stat .value.amber { color: var(--amber); }
+  .stat .hint { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+  /* demo widget */
+  .demo { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 0 0 48px; }
+  .demo h2 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+  .demo .demo-help { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  .demo-form { display: flex; gap: 8px; }
+  .demo-form input { flex: 1; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 14px; outline: none; }
+  .demo-form input:focus { border-color: var(--blue); }
+  .demo-form button { padding: 12px 20px; background: var(--text); color: var(--bg); border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .demo-form button:hover { opacity: 0.9; }
+  .demo-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .result { margin-top: 16px; padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: var(--mono); font-size: 13px; line-height: 1.6; display: none; white-space: pre-wrap; word-break: break-all; }
+  .result.live { border-color: var(--green); }
+  .result.broken, .result.mismatch { border-color: var(--red); }
+  .result.unexpected_200, .result.invalid_402 { border-color: var(--amber); }
+  .result .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 8px; }
+  .result .badge.live { background: var(--green); color: var(--bg); }
+  .result .badge.broken, .result .badge.mismatch { background: var(--red); color: var(--bg); }
+  .result .badge.unexpected_200, .result .badge.invalid_402 { background: var(--amber); color: var(--bg); }
+  .result .badge.fetch_error { background: var(--muted); color: var(--bg); }
+  .result .badge.timeout { background: var(--muted); color: var(--bg); }
+
+  /* reasons */
+  .reasons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0 0 48px; }
+  .reason { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; min-width: 0; }
+  .reason h3 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+  .reason p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .reason code { font-size: 12px; overflow-wrap: anywhere; word-break: break-all; max-width: 100%; }
+
+  /* pitch */
+  .pitch { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin: 0 0 48px; }
+  .pitch h2 { margin: 0 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .pitch p { margin: 0 0 14px; color: var(--text); line-height: 1.6; }
+  .pitch p:last-child { margin-bottom: 0; }
+  .pitch strong { color: var(--green); }
+  .pitch code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .faq h3 { font-size: 15px; font-weight: 600; margin: 18px 0 6px; }
+  .faq p { margin: 0 0 10px; }
+
+  /* footer */
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 700px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .reasons { grid-template-columns: 1fr; }
+    .reason { padding: 16px; }
+    h1 { font-size: 32px; }
+    .demo-form { flex-direction: column; }
+    .wrap { padding: 36px 16px 64px; }
+  }
+</style>
+</head>
+<body>
+<main id="main-content">
+<div class="wrap">
+
+  <div class="brand">
+    <span style="display:flex;align-items:center;gap:10px;"><span class="dot"></span><span>Watch402</span></span>
+    <span style="margin-left:auto;font-size:13px;display:flex;gap:16px;"><a href="/bazaar-report">Bazaar report</a><a href="/about">How it works</a></span>
+  </div>
+
+  <h1>Every x402 listing on the Bazaar,<br><span class="accent">checked daily. Publicly.</span></h1>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="label">Live &amp; serving 402</div><div class="value green" id="stat-live">—</div></div>
+    <div class="stat"><div class="label">Charge differently than listed</div><div class="value red" id="stat-drifted">—</div></div>
+    <div class="stat"><div class="label">Broken payment setup</div><div class="value amber" id="stat-bad402">—</div></div>
+    <div class="stat"><div class="label">Gone or unreachable</div><div class="value red" id="stat-gone">—</div></div>
+    <div class="stat"><div class="label">Server errors (5xx)</div><div class="value amber" id="stat-serverdown">—</div></div>
+    <div class="stat"><div class="label">Rejecting monitors</div><div class="value amber" id="stat-clienterr">—</div></div>
+    <div class="stat"><div class="label">Can't verify yet</div><div class="value" id="stat-unverifiable">—</div></div>
+    <div class="stat"><div class="label">Not yet checked</div><div class="value" id="stat-pending">—</div></div>
+  </div>
+  <p id="stat-total-line" style="font-size:13px;color:var(--muted);margin:-36px 0 6px;line-height:1.7;"></p>
+  <p id="stat-detail" style="font-size:13px;color:var(--muted);margin:0 0 48px;line-height:1.7;"></p>
+
+  <div class="demo">
+    <h2>Check any x402 endpoint now</h2>
+    <p class="demo-help">Paste a URL. We fetch it, parse the 402 PAYMENT-REQUIRED header, and show you what your buyers actually see. No USDC sent. Own the endpoint? Claim it right after.</p>
+    <form class="demo-form" id="demo-form" aria-labelledby="demo-url-label">
+      <label for="demo-url" id="demo-url-label" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">x402 endpoint URL to check</label>
+      <input type="url" id="demo-url" placeholder="https://your-api.example.com/paid-route" required spellcheck="false" autocomplete="off" aria-required="true">
+      <button type="submit" id="demo-btn">Check</button>
+    </form>
+    <div class="result" id="result"></div>
+    <div id="claim-cta" style="display:none;margin-top:14px;padding:12px 16px;border:1px solid var(--green);border-radius:8px;font-size:14px;"></div>
+  </div>
+
+  <div class="pitch" id="alerts">
+    <h2>Your listing breaks silently. Don't let it break your sales.</h2>
+    <p>Every x402 seller eventually ships a bad config: a redeploy moves the payout wallet, a price change never reaches the catalog, a host dies on a Friday. Buyers don't email you about it — they just pay someone else. <strong>Watch402 watches your listing the way buyers do</strong>, around the clock, and messages you in Telegram the moment anything changes.</p>
+    <p><strong>$5 USDC per listing for 30 days of alerts,</strong> paid on Base — a plain USDC transfer, or natively over x402 if you're an agent (<code>POST /v1/x402/alerts</code>, EIP-3009, settled via facilitator). Monitoring and public status pages are free forever, for every listing in both catalogs.</p>
+  </div>
+
+  <div class="reasons" id="how-claim">
+    <div class="reason"><h3>1 · Claim free</h3><p>Open your status page and sign one message with the listing's own payout wallet. Proof of ownership without accounts, email or card.</p></div>
+    <div class="reason"><h3>2 · Arm Telegram</h3><p>Tap the link after claiming and press START — <code>@watchx402_bot</code> links itself to your listing automatically.</p></div>
+    <div class="reason"><h3>3 · Get alerted</h3><p>Daily rechecks diff price, wallet and network against the catalog. Drift, downtime or recovery → Telegram DM within hours.</p></div>
+  </div>
+
+  <div class="reasons" id="features">
+    <div class="reason"><h3>Continuous drift detection</h3><p>Live <code>PAYMENT-REQUIRED</code> challenges diffed daily against advertised terms: price, payout wallet, network, scheme, HTTP method.</p></div>
+    <div class="reason"><h3>Downtime &amp; recovery alerts</h3><p>Dead endpoints and recoveries are caught by the same probes that power the public stats — no separate ping service needed.</p></div>
+    <div class="reason"><h3>A public status page per listing</h3><p>Every monitored endpoint gets <code>/s/{id}</code>: current verdict, price, wallet, network and last check time. Shareable proof you're alive.</p></div>
+    <div class="reason"><h3>Agent-native checkout</h3><p>The alert subscription is itself an x402 resource — agents discover it in the bazaars and subscribe with a signed USDC payment. No keys, no accounts.</p></div>
+    <div class="reason"><h3>Check before you buy</h3><p>Integrating someone's x402 API? Run it through the demo above first — real verdict, price, wallet and network in seconds, no account needed.</p></div>
+    <div class="reason"><h3>Coverage that refreshes weekly</h3><p>New PayAI Bazaar and Coinbase CDP listings are ingested every Sunday at 00:00 UTC. You never register anywhere.</p></div>
+  </div>
+
+  <p class="lede" style="margin-bottom:48px;">Watch402 watches the two x402 discovery catalogs — the <strong>PayAI Network Bazaar</strong> and <strong>Coinbase CDP x402 Discovery</strong> — covering <span id="stat-catalog-n" style="color:var(--text);font-weight:600;">40,937</span> paid-API endpoints. Each listing is rechecked on a schedule matched to its health: anything serving payments is verified every day, dead endpoints are swept weekly. We hit your endpoint, parse the live HTTP 402 PAYMENT-REQUIRED challenge, and compare price, payout wallet and network against what the catalog advertises. When they stop matching, it shows up here.</p>
+
+  <div class="reasons" id="coverage">
+    <div class="reason">
+      <h3>PayAI Network Bazaar</h3>
+      <p>The largest x402 discovery catalog, at <code>facilitator.payai.network/discovery/resources</code>. Watch402 ingests every listing — resource URL, advertised price in USDC atomic units, payout wallet, network and scheme — and re-probes each endpoint daily with the HTTP method and example inputs the listing declares.</p>
+    </div>
+    <div class="reason">
+      <h3>Coinbase CDP x402 Discovery</h3>
+      <p>Coinbase's official catalog via the Developer Platform, at <code>api.cdp.coinbase.com/platform/v2/x402/discovery/resources</code>. ~15,000 additional listings, many not present in any other index. Same daily treatment: live 402 fetch, header parse, full diff against the advertised terms.</p>
+    </div>
+    <div class="reason">
+      <h3>What a daily check covers</h3>
+      <p>We request the exact resource URL with its declared method (GET/POST), example path and query parameters, and example body. We parse the base64 PAYMENT-REQUIRED header from the 402 response, extract every <code>accepts[]</code> entry, and diff price, payTo wallet, network and scheme against the catalog. Verdicts: live · drifted · broken · misconfigured · unreachable.</p>
+    </div>
+  </div>
+
+  <div class="reasons">
+    <div class="reason">
+      <h3>Seller-side, not buyer-side</h3>
+      <p>Every other x402 trust tool warns the buyer before they pay. We watch from your side of the table: what your PayAI or Coinbase listing looks like right now, and whether it matches what the catalog promises.</p>
+    </div>
+    <div class="reason">
+      <h3>Detects the #1 break mode</h3>
+      <p>Price drift. ScoutScore's February 2026 audit found 58% of Bazaar listings advertise the wrong price. Every endpoint here is rechecked daily and diffed against its advertised terms.</p>
+    </div>
+    <div class="reason">
+    <h3>Zero setup, free monitoring</h3>
+    <p>No signup, no API key, no card. Paste any Bazaar URL above and see exactly what buyers see. Monitoring is free for every listing; Telegram alerts are $5 USDC per 30 days.</p>
+    </div>
+  </div>
+
+  <div class="pitch">
+    <h2>The pitch, in three sentences</h2>
+    <p><strong>If you sell on x402, you have a listing in a discovery catalog</strong> — the PayAI Network Bazaar, Coinbase CDP x402 Discovery, or both. That listing can break in dozens of ways: your wallet changes, your price drifts, your server dies, your resource URL 404s. The protocol won't tell you. Your buyers won't tell you. They'll just stop paying.</p>
+    <p><strong>Watch402 is the thing that tells you.</strong> We recheck every listing daily, parse the live 402 challenge, and diff it against what the Bazaar advertises — price, wallet, network, scheme. Everything we find is public on this page, free.</p>
+    <p><strong>The demo above works on your endpoint right now.</strong> No signup — paste a URL and see what buyers see. Claim your listing to arm Telegram alerts; agents can subscribe programmatically at <code>POST /v1/x402/alerts</code>. Everything runs live today.</p>
+  </div>
+
+  <div class="pitch faq" id="faq">
+    <h2>Frequently asked</h2>
+    <h3>What does Watch402 cost?</h3>
+    <p>Monitoring, public status pages and the read API are free for every listing in both catalogs. Telegram alerts are $5 USDC per listing per 30 days, paid on Base.</p>
+    <h3>How do I get alerts for my listing?</h3>
+    <p>Claim the listing free by signing with its payout wallet from your status page (<code>/s/{id}</code>), press START on <code>@watchx402_bot</code>, then pay $5 — by USDC transfer or native x402 payment.</p>
+    <h3>What triggers an alert?</h3>
+    <p>Your listing going unreachable, coming back, or drifting from its advertised terms: price changed, payout wallet swapped, network or scheme changed. Each DM includes what changed and when.</p>
+    <h3>How fresh is the data?</h3>
+    <p>Listings that serve payments are rechecked at least every 24 hours; dead or unreachable ones weekly; new and claimed listings immediately. Every page shows its last check time.</p>
+    <h3>Can AI agents subscribe to alerts?</h3>
+    <p>Yes — <code>/v1/x402/alerts</code> is a native x402 resource: agents fetch it, receive the 402 challenge, and pay $5 USDC on Base with one EIP-3009 signature. No accounts anywhere in the flow.</p>
+    <h3>Does Watch402 ever spend my funds?</h3>
+    <p>No. Probes stop at the unpaid 402 response. Alert payments move only the $5 you authorize, from your own wallet, settled through a public facilitator.</p>
+  </div>
+
+  <footer>
+    <div>
+      Watch402 · made for the x402 ecosystem
+    </div>
+    <div>
+      sources: <a href="https://facilitator.payai.network/discovery/resources" rel="noopener">PayAI Bazaar</a> · <a href="https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources" rel="noopener">Coinbase CDP Discovery</a> · <a href="/about">how it works</a> · <a href="/bazaar-report">state of the bazaar</a> · <a href="https://docs.x402.org">x402 docs</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const fmt = (n) => typeof n === 'number' ? n.toLocaleString() : '—';
+
+async function loadStats() {
+  try {
+    const r = await fetch('/v1/stats', { cache: 'no-store' });
+    if (!r.ok) throw new Error('stats ' + r.status);
+    const j = await r.json();
+    const b = j.breakdown ?? {};
+    // exhaustive buckets — must sum to j.total
+    const gone = (b.endpointGone?.notFound ?? 0) + (b.endpointGone?.gone ?? 0) + (b.unreachable?.timeout ?? 0) + (b.unreachable?.connFailed ?? 0);
+    $('#stat-live').textContent = fmt(j.live) + ' (' + (j.total ? Math.round(j.live * 100 / j.total) : 0) + '%)';
+    $('#stat-drifted').textContent = fmt(Object.values(b.drifted ?? {}).reduce((a, v) => a + v, 0));
+    $('#stat-bad402').textContent = fmt((b.misconfigured402?.missingOrBadHeader ?? 0) + (b.misconfigured402?.answeredWithoutPayment ?? 0));
+    $('#stat-gone').textContent = fmt(gone);
+    $('#stat-serverdown').textContent = fmt(b.httpErrors?.serverDown ?? 0);
+    $('#stat-clienterr').textContent = fmt(b.httpErrors?.clientErr ?? 0);
+    $('#stat-unverifiable').textContent = fmt(j.unknown ?? b.needsParams ?? 0);
+    $('#stat-pending').textContent = fmt(j.unprobed ?? 0);
+    const catN = document.getElementById('stat-catalog-n');
+    if (catN) catN.textContent = (j.total ?? 0).toLocaleString();
+    $('#stat-total-line').textContent = 'Every x402 listing on the PayAI and Coinbase catalogs: ' + (j.total ?? 0).toLocaleString() + ' endpoints — the buckets above account for all of them.';
+    // sales pitch line — skeleton fixed, numbers live from /v1/stats
+    const driftTotal = Object.values(b.drifted ?? {}).reduce((a, v) => a + v, 0);
+    const priceN = b.drifted?.price ?? 0, walletN = b.drifted?.payTo ?? 0;
+    const badSetup = (b.misconfigured402?.missingOrBadHeader ?? 0) + (b.misconfigured402?.answeredWithoutPayment ?? 0);
+    const goneTotal = (b.endpointGone?.notFound ?? 0) + (b.endpointGone?.gone ?? 0) + (b.unreachable?.timeout ?? 0) + (b.unreachable?.connFailed ?? 0);
+    const n = (x) => Number(x || 0).toLocaleString();
+    let pitch;
+    if (driftTotal === 1) {
+      pitch = `Right now, 1 listing charges differently than it advertises` +
+        (badSetup ? ` — and ${n(badSetup)} more leak money with broken payment setups` : '') + '.';
+    } else if (driftTotal > 1) {
+      pitch = `Right now, ${n(driftTotal)} listings charge differently than they advertise` +
+        ((priceN || walletN) ? ` — ${priceN ? `${n(priceN)} changed their price` : ''}${priceN && walletN ? ', ' : ''}${walletN ? `${n(walletN)} quietly switched payout wallets` : ''}` : '') +
+        (badSetup ? ` — and ${n(badSetup)} more leak money with broken payment setups` : '') + '.';
+    } else {
+      pitch = `No listing is currently drifting from its advertised terms — when one does, it shows up here within hours`;
+      if (badSetup) pitch += `, though ${n(badSetup)} leak money with broken payment setups`;
+      pitch += '.';
+    }
+    const goneBit = goneTotal > 0 ? ` Over ${goneTotal >= 1000 ? (Math.floor(goneTotal / 100) / 10).toLocaleString() + 'k' : n(goneTotal)} endpoints on these catalogs are already dead.` : '';
+    const dTier = j.tiers?.daily;
+    let covBit = '';
+    if (dTier && dTier.total) {
+      const pct = Math.round(dTier.fresh * 100 / dTier.total);
+      covBit = pct >= 100 ? ' Every listing due for a check today was checked — on time.' : ` Daily sweep in progress — ${pct}% of due listings verified so far.`;
+    }
+    const hook = (driftTotal + badSetup) > 0 ? ' Yours?' : '';
+    $('#stat-detail').textContent = pitch + goneBit + covBit + hook;
+  } catch (e) {
+    // graceful degrade — leave dashes
+  }
+}
+loadStats();
+setInterval(loadStats, 30000);
+
+const form = $('#demo-form');
+const urlInput = $('#demo-url');
+const btn = $('#demo-btn');
+const result = $('#result');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = urlInput.value.trim();
+  if (!url) return;
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  result.style.display = 'none';
+  result.className = 'result';
+  try {
+    // First attempt: GET (no method hint)
+    let r = await fetch('/v1/check?url=' + encodeURIComponent(url));
+    let j = await r.json();
+    // If 405, retry with POST method
+    if (j.result === 'broken' && j.httpStatus === 405) {
+      r = await fetch('/v1/check?url=' + encodeURIComponent(url) + '&method=POST');
+      j = await r.json();
+    }
+    renderResult(j);
+  } catch (e) {
+    result.textContent = 'Network error: ' + (e?.message || e);
+    result.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check';
+  }
+});
+
+async function maybeClaimCta(checkedUrl) {
+  const cta = document.getElementById('claim-cta');
+  try {
+    const r = await fetch('/v1/sellers?url=' + encodeURIComponent(checkedUrl));
+    const d = await r.json();
+    if (d.item) {
+      cta.innerHTML = '✓ This endpoint is listing <strong>#' + d.item.id + '</strong> in our catalog — it gets rechecked daily. <a href="/s/' + d.item.id + '" style="font-weight:600;">Claim it free →</a>';
+      cta.style.display = 'block';
+    } else if (d.item === null) {
+      cta.textContent = 'Not in our catalog yet — new listings are picked up from PayAI and Coinbase on the next catalog refresh.';
+      cta.style.display = 'block';
+      cta.style.borderColor = 'var(--border)';
+    }
+  } catch { /* CTA is best-effort */ }
+}
+
+function renderResult(j) {
+  document.getElementById('claim-cta').style.display = 'none';
+  const lines = [];
+  lines.push(`<span class="badge ${j.result}">${j.result}</span>`);
+  lines.push(`<strong>${j.url}</strong>`);
+  lines.push('');
+  lines.push(`HTTP:    ${j.httpStatus}`);
+  lines.push(`Time:    ${j.responseMs}ms`);
+  if (j.livePrice)     lines.push(`Price:   ${j.livePrice} (atomic ${j.liveScheme ?? ''} on ${j.liveNetwork ?? ''})`);
+  if (j.livePayTo)     lines.push(`Wallet:  ${j.livePayTo}`);
+  if (j.liveNetwork)   lines.push(`Network: ${j.liveNetwork}`);
+  if (j.liveScheme)    lines.push(`Scheme:  ${j.liveScheme}`);
+  if (j.error)         lines.push(`Note:    ${j.error}`);
+  result.innerHTML = lines.join('\n');
+  result.className = 'result ' + j.result;
+  result.style.display = 'block';
+  if (j.url) maybeClaimCta(j.url);
+}
+</script>
+</main>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"19b7de0a86a540cabb91c97a13f15d90","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

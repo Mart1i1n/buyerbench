@@ -1,0 +1,955 @@
+# StableEnrich API Reference
+## Authentication
+
+All endpoints require micropayment. Include payment headers as per the HTTP 402 specification. Payments are processed on Base mainnet (eip155:8453), Solana, or Tempo.
+
+## Base URL
+
+https://stableenrich.dev
+
+All endpoints are relative to this base URL.
+
+## Agent Workflow (Progressive)
+
+1. Discover candidate endpoints with `mcp__agentcash__discover_api_endpoints("https://stableenrich.dev")`.
+2. If discovery reports `guidanceAvailable=true` but guidance is omitted, only re-run with `include_guidance=true` when domain-level methodology is needed.
+3. For selected POST/PUT/PATCH endpoints, call `mcp__agentcash__check_endpoint_schema` before first fetch.
+4. Execute with `mcp__agentcash__fetch`.
+
+**AgentCash response envelope:** Paid 200s from `mcp__agentcash__fetch` return `{ success: true, data: <HTTP body> }` — not the bare OpenAPI body. Parse endpoint fields at `.data.people`, `.data.companies`, `.data.metadata`, etc. Large responses may spill to a file; jq on that file still starts at `.data.*`.
+
+If no endpoint matches the user task, stop this origin flow and switch to another origin.
+
+## Schema Discovery
+
+All endpoints support schema discovery via the `check_endpoint_schema` tool. Use it on the selected endpoint to confirm request schema and pricing before execution.
+
+## Web Scraping
+
+For web scraping tasks, always start with **Firecrawl `/api/firecrawl/scrape`** ($0.0126/request). It provides comprehensive page content with clean markdown formatting.
+
+If you need to scrape many URLs and cost is a concern, consider **Exa `/api/exa/contents`** ($0.002/request) as a cheaper alternative for bulk processing.
+
+---
+
+# Research Methodology (Fan-out / Population Tasks)
+
+Use this playbook for ambiguous, broad, or "find many candidates" requests (e.g., "junior hedge fund carry-trade people who might start a company"):
+
+1. **Detect fan-out**: If the request implies a population or list-building task, avoid single-search answers. Plan for *many* queries and a large candidate pool.
+2. **Clarify constraints**: Restate the target, must-haves, nice-to-haves, geography, seniority, timeframe, and desired output size. If unclear, make explicit assumptions and proceed.
+3. **Broad-to-narrow pipeline**:
+   - **Seed**: Use multiple discovery sources to build an initial pool (Exa `/api/exa/search` with `category: "people"` for people discovery, Firecrawl for web lists, Google Maps for local orgs, FullEnrich company-search for company lists).
+   - **Expand**: Generate query variants (synonyms, titles, strategies, regions) and paginate until you reach a healthy pool (aim 50–100 candidates).
+   - **Enrich**: Resolve LinkedIn URLs first (Exa `/api/exa/search` with `category: "people"` or FullEnrich people-search), then PDL `/api/pdl/people-enrich` by `profile` — do not default to name+domain. Use Minerva enrich for LinkedIn/demographic data or Clado contacts-enrich for email/phone when PDL is insufficient; dedupe by name + company + profile URL.
+   - **Filter**: Apply the must-haves; keep 30–50 high-confidence matches.
+4. **Tool choreography**: Use **mcp__agentcash__fetch** for all paid endpoints. Verify company domains with `/api/companyenrich/org-enrich` (when you have a domain), `/api/companyenrich/properties-enrich` (when you only have name or social URLs), or `/api/fullenrich/company-search` before large people searches to avoid wasted calls.
+5. **Evidence and transparency**: Track sources per candidate; note uncertainty; surface how the list was constructed and where gaps remain.
+
+---
+
+# Google Maps API
+
+## POST /api/google-maps/text-search/full
+Search for places using a text query with full field details (includes ratings, reviews, contact info, and atmosphere data).
+Price: $0.08 per request
+
+Example:
+```json
+{
+  "textQuery": "coffee shops in San Francisco",
+  "maxResultCount": 5
+}
+```
+
+---
+
+## POST /api/google-maps/text-search/partial
+Search for places using a text query with partial field details (basic info only, lower cost).
+Price: $0.02 per request. Same request body as /text-search/full.
+
+---
+
+## POST /api/google-maps/nearby-search/full
+Search for places near a geographic location with full details.
+Price: $0.08 per request
+
+Example:
+```json
+{
+  "locationRestriction": {
+    "circle": {
+      "center": { "latitude": 37.7749, "longitude": -122.4194 },
+      "radius": 1000
+    }
+  },
+  "maxResultCount": 5
+}
+```
+
+---
+
+## POST /api/google-maps/nearby-search/partial
+Search for places near a geographic location with partial details.
+Price: $0.02 per request. Same request body as /nearby-search/full.
+
+---
+
+## GET /api/google-maps/place-details/full
+Get full details for a specific place by ID.
+Price: $0.05 per request
+
+Example: GET /api/google-maps/place-details/full?placeId=ChIJN1t_tDeuEmsRUsoyG83frY4
+
+---
+
+## GET /api/google-maps/place-details/partial
+Get partial details for a specific place by ID.
+Price: $0.02 per request. Same query parameters as /place-details/full.
+
+---
+
+## GET /api/google-maps/solar/building-insights
+Google Solar API — closest building insights for a lat/lng. Use this as a cheap probe to confirm Solar coverage for an address and to read the imagery capture date (`imageryDate`) before fetching the full data layers.
+Price: $0.02 per request
+
+Query parameters:
+- `latitude` (required) — building latitude
+- `longitude` (required) — building longitude
+- `requiredQuality` (optional, default `HIGH`) — `LOW` | `MEDIUM` | `HIGH`
+
+Example:
+GET /api/google-maps/solar/building-insights?latitude=37.4220&longitude=-122.0841&requiredQuality=LOW
+
+Returns roof segments, sunshine hours, panel capacity estimates, plus `imageryDate` and `imageryProcessedDate`.
+
+---
+
+## GET /api/google-maps/solar/data-layers
+Google Solar API — aerial GeoTIFF data layers for a building. Returns signed URLs for the actual aerial RGB photograph (`rgbUrl`), digital surface model (`dsmUrl`), shade/flux maps, and a building mask, along with `imageryDate` (the capture date of the photo).
+Price: $0.08 per request
+
+Query parameters:
+- `latitude` (required)
+- `longitude` (required)
+- `radiusMeters` (optional, default `50`, max `175`) — radius around the lat/lng to include
+- `view` (optional, default `FULL_LAYERS`) — `DSM_LAYER` | `IMAGERY_LAYERS` | `IMAGERY_AND_ANNUAL_FLUX_LAYERS` | `IMAGERY_AND_ALL_FLUX_LAYERS` | `FULL_LAYERS`
+- `requiredQuality` (optional, default `HIGH`) — `LOW` | `MEDIUM` | `HIGH`
+- `pixelSizeMeters` (optional, default `0.25`) — must be one of `0.1`, `0.25`, `0.5`, `1.0`
+- `exactQualityRequired` (optional, default `false`)
+
+Example:
+GET /api/google-maps/solar/data-layers?latitude=37.4220&longitude=-122.0841&radiusMeters=50&view=IMAGERY_LAYERS
+
+The returned URLs are signed and expire — fetch the GeoTIFFs promptly. To convert a GeoTIFF to PNG/JPEG use `gdal_translate` or any image library that reads TIFF.
+
+---
+
+## GET /api/google-maps/aerial-view/lookup-video
+Google Aerial View API — look up a previously rendered 3D flyover video for an address (or by `videoId`). Returns video URIs (landscape, portrait, thumbnail) and metadata. Returns `state: PROCESSING` if a video has been requested but not finished rendering.
+Price: $0.01 per request
+
+Query parameters (provide one):
+- `address` — street address to look up
+- `videoId` — existing video ID
+
+Example:
+GET /api/google-maps/aerial-view/lookup-video?address=1600+Amphitheatre+Parkway+Mountain+View+CA
+
+---
+
+## POST /api/google-maps/aerial-view/render-video
+Google Aerial View API — request rendering of a new flyover video for an address. The render is asynchronous; poll `/api/google-maps/aerial-view/lookup-video` until `state: ACTIVE` to retrieve the finished URIs.
+Price: $0.01 per request
+
+Example:
+```json
+{
+  "address": "1600 Amphitheatre Parkway, Mountain View, CA"
+}
+```
+
+---
+
+# B2B Data (FullEnrich, CompanyEnrich, PDL)
+
+## Organization lookup workflow
+
+Before people searches filtered by company, verify the target domain:
+
+1. Call `/api/fullenrich/company-search` with the company name (use `exact_match: true` when the name is known precisely — then verify `domain` in results; see exact_match notes below), or
+2. Call `/api/companyenrich/org-enrich` with the domain to confirm the company profile.
+3. Use the verified domain in `/api/fullenrich/people-search` via `current_company_domains`.
+
+FullEnrich returns unobfuscated names in search (~80%). Email is **not** in search results — use `/api/pdl/people-enrich` for full profile, emails, and phone ($0.28/match, free on miss). Prefer `email` input when you already have a work address.
+
+If B2B endpoints do not return needed data, fall back to Minerva (`/api/minerva/resolve` + `/api/minerva/enrich`) or Clado (`/api/clado/contacts-enrich`).
+
+## POST /api/fullenrich/company-search
+Search for companies by filters.
+Price: **$0.15 per query when results are found; free when no matches.** Returns up to **10 companies** per query (server-set page size). FullEnrich upstream is **0.25 credits per result returned** ([credit docs](https://docs.fullenrich.com/api/v2/general/credit)).
+
+**Required filters:** Provide at least one of `names`, `industries`, or `headquarters_locations`. `page`/`offset` alone returns **400 before payment**.
+
+**Filter shape:** Each filter array entry must be `{ "value": "..." }` (plain strings and `{ "name": "..." }` are coerced). `headcount_min`/`headcount_max` flat fields are coerced to `headcounts: [{ min, max }]`.
+
+**`industries` values:** Must be exact FullEnrich enum strings — free-text like `"Artificial Intelligence"` returns **400**. There is no AI-specific industry; OpenAI, Anthropic, and similar companies index under `"Research Services"`, not a dedicated AI label. Common values:
+
+- `"Software Development"`
+- `"Research Services"`
+- `"Financial Services"`
+- `"Technology, Information and Internet"`
+- `"Venture Capital and Private Equity Principals"`
+- `"Medical Equipment Manufacturing"`
+- `"Information Technology & Services"`
+
+Full catalog (490 values): [Company Industry enum](https://docs.fullenrich.com/api/v2/general/enums#company-industry).
+
+**`exact_match`:** `exact_match: true` matches on the name string only — it does **not** resolve brand intent and does **not** guarantee a single hit. Unrelated same-name companies still appear, often ranked first.
+
+For common-word or ambiguous brand names, filter results by `domain` or `headcount` after retrieval — do not assume rank #1 is correct:
+- `"ElevenLabs"` + `exact_match` → elevenlabs.com.au (health food) can rank above elevenlabs.io (AI)
+- `"Runway"` + `exact_match` → runway.com (FP&A finance) can rank above runwayml.com (AI video)
+
+**Legal entity vs brand:** Search by legal entity name, not product or brand name — they often differ (e.g. Cursor AI appears under `"Anysphere"`, not `"Cursor"`).
+
+**Pagination:** `page` may be **silently ignored on cached responses** — `page: 2` can return identical results to `page: 0`. **Always use `search_after`** for reliable pagination: pass the cursor token from response `metadata.search_after` on the next request.
+
+Example (first page):
+```json
+{
+  "industries": [{ "value": "Research Services" }],
+  "headquarters_locations": [{ "value": "United States" }]
+}
+```
+
+Example (next page — use cursor from prior response `metadata.search_after`):
+```json
+{
+  "search_after": "<token from metadata.search_after>",
+  "industries": [{ "value": "Research Services" }],
+  "headquarters_locations": [{ "value": "United States" }]
+}
+```
+
+Confirmed behavior: `page: 2` repeated page-0 results (Salesforce, GitHub, Airbnb); `search_after` returned the correct next page (Docker, Splunk, Zendesk).
+
+---
+
+## POST /api/fullenrich/people-search
+Search for people/contacts matching criteria.
+Price: **$0.15 per query when results are found; free when no matches.** Returns up to **10 people** per query (server-set page size). Upstream bills 0.25 FullEnrich credits per person returned.
+
+**`offset` alone always returns 400** — include at least one search filter (`current_company_domains`, `current_position_seniority_level`, `person_locations`, etc.).
+
+**Filter shape:** Each filter array accepts plain strings **or** `{"value":"..."}` objects. Both are valid:
+```json
+{ "current_company_domains": ["stripe.com"], "current_position_seniority_level": ["VP"] }
+{ "current_company_domains": [{ "value": "stripe.com" }], "current_position_seniority_level": [{ "value": "VP" }] }
+```
+Do **not** send `{"offset":0}` with no filters. Call `check_endpoint_schema` before first use.
+
+Example:
+```json
+{
+  "current_company_domains": [{ "value": "stripe.com" }],
+  "current_position_seniority_level": [{ "value": "VP" }]
+}
+```
+
+**Response shape (default lean):** HTTP body is `{ people, companies, metadata }`. Each person has `employment.current` only (no `employment.all`). Positions use `company_id` — resolve employer via `companies[company_id]` (deduped map, not repeated inline blobs). AgentCash fetch: `.data.people`, `.data.companies`, `.data.metadata`. Empty `people` → not billed.
+
+**Opt-in expansions:**
+- `include_employment_history: true` — adds `employment.all` with `company_id` refs; `companies` includes all referenced employers.
+- `verbose: true` — raw FullEnrich shape (inline `company` objects, full `employment.all`, no top-level `companies` map). Escape hatch during contract stabilization.
+
+Example (full career history):
+```json
+{
+  "current_company_domains": [{ "value": "stripe.com" }],
+  "current_position_seniority_level": [{ "value": "VP" }],
+  "include_employment_history": true
+}
+```
+
+**Seniority vs title:** Use `current_position_seniority_level` for population queries (e.g. all VPs at a company). Use `current_position_titles` only when you need an exact title match — it returns far fewer results.
+
+**Seniority enum (request filters):** Use exact FullEnrich filter values from [Seniority enum](https://docs.fullenrich.com/api/v2/general/enums#seniority) — e.g. `C-level`, `VP`, `Head`, `Founder`. Do **not** use Apollo/other-provider values like `c_suite`; FullEnrich returns **400**. Response `employment.current.seniority` labels are output-only — do not copy them into filter values.
+
+**Zero-result recovery:** Combining **3+ filters** frequently returns zero results. If `.data.people` (AgentCash) or `people` (raw HTTP) is empty, remove the most restrictive filter first — `current_position_titles` is usually the cause. Start with **domain + seniority**, then add title only if needed.
+
+**Filter logic:** Filters **AND across categories, OR within a category** ([filtering logic](https://docs.fullenrich.com/api/v2/general/filtering-logic-explained)). Prefer seniority enum values (`C-level`, `VP`, `Head`, `Founder`, etc.) over exact titles. Full list: [Seniority enum](https://docs.fullenrich.com/api/v2/general/enums#seniority). Avoid `"Director"` in domain-scoped queries — too common; domain weighting collapses. Use `VP`, `Head`, or `Founder` instead. `person_locations` without `current_company_domains` is very broad — pair location with a company domain when possible.
+
+**Domain coverage:** People search coverage varies by company domain. Some domains (e.g. `figma.com`) return zero results regardless of filters. If a domain-scoped query is empty with minimal filters, the domain may not be indexed.
+
+**`current_company_days_since_last_job_change`:** Days since the person last changed jobs in FullEnrich's graph — **not necessarily** the start date of their current role. Larger ranges (500–1000) are more reliable than tight windows. Compounds aggressively with other filters — use with **one or two other filters max**.
+
+Example (recency + domain, no title):
+```json
+{
+  "current_company_domains": [{ "value": "stripe.com" }],
+  "current_company_days_since_last_job_change": [{ "min": 500, "max": 1000 }]
+}
+```
+
+Example (seniority instead of title):
+```json
+{
+  "current_company_domains": [{ "value": "stripe.com" }],
+  "current_position_seniority_level": [{ "value": "C-level" }]
+}
+```
+
+---
+
+## POST /api/companyenrich/org-enrich
+Enrich a company profile by domain.
+Price: $0.06 per request
+
+`employees` and `revenue` are **range strings** (e.g. `"5K-10K"`, `"over-1b"`) — do not numeric-compare them.
+
+**Known issue — `openai.com`:** Resolves to an unrelated third-party ChatGPT fan page (~18 employees, no real funding). There is currently no workaround — the correct OpenAI record is not accessible via this endpoint.
+
+**Domain resolution:** CompanyEnrich may return a different canonical `domain` than your input. Always verify the returned `domain` matches your intent before downstream people searches.
+
+**Domains not indexed:** `x.com` (Twitter/X) returns **404** — the post-rebrand domain is not in the index. Use `twitter.com` instead.
+
+**Funding data:** `total_funding` is independently sourced and may not reflect recent rounds. Prefer the `funding` array for the most current round data — it updates more frequently than the scalar. Funding reflects VC/PE rounds only; **M&A acquisitions are not included** (e.g. GitHub's Microsoft acquisition does not appear).
+
+**`expand: "workforce"`:** Only useful if the domain resolves correctly. Before using workforce expansion, verify the returned `domain` matches your input — if CompanyEnrich canonicalized to a different domain, workforce data reflects that company, not yours.
+
+Example:
+```json
+{
+  "domain": "stripe.com"
+}
+```
+
+---
+
+## POST /api/companyenrich/properties-enrich
+Enrich a company profile by name or social URL when you do not have a domain.
+Price: $0.06 per request
+
+Prefer `/api/companyenrich/org-enrich` when you have a domain — domain lookups are faster and more reliable. Use this endpoint when you only have a company name, LinkedIn URL/ID, or other social profile URL.
+
+Upstream uses **best match** disambiguation — always verify the returned `domain` and `name` match your intent before downstream people searches.
+
+`employees` and `revenue` are **range strings** (e.g. `"5K-10K"`, `"over-1b"`) — do not numeric-compare them.
+
+**`expand: "workforce"`:** Only useful if the resolved company matches your intent. Verify the returned `domain` before trusting workforce data.
+
+Example (LinkedIn URL):
+```json
+{
+  "linkedinUrl": "https://www.linkedin.com/company/stripe"
+}
+```
+
+Example (company name):
+```json
+{
+  "name": "Stripe"
+}
+```
+
+---
+
+## POST /api/pdl/people-enrich
+Enrich a person with full career history, emails, and phone from People Data Labs.
+Price: **$0.28 per match — free when no record is found (HTTP 200, data: null)**
+
+Supported inputs (one group required — ranked by reliability):
+1. `email` — **highest reliability**; when you have a known work email, use it as the sole input (often likelihood 9)
+2. `profile` — LinkedIn URL; good hit rate but not better than email when email is known
+3. `first_name` + `last_name` + `company_name` or `company_domain` — fallback; similar coverage to profile, not a substitute when the person is absent from PDL
+
+**Common 400:** `{ "first_name": "...", "last_name": "..." }` alone is invalid — add `email`, `profile`, or name plus `company_name`/`company_domain`.
+
+Example (email — preferred when available):
+```json
+{
+  "email": "patrick@stripe.com"
+}
+```
+
+Example (LinkedIn):
+```json
+{
+  "profile": "https://www.linkedin.com/in/patrickcollison"
+}
+```
+
+Example (name + domain — fallback):
+```json
+{
+  "first_name": "Patrick",
+  "last_name": "Collison",
+  "company_domain": "stripe.com"
+}
+```
+
+**No match:** Returns **HTTP 200** with `{ "status": 404, "likelihood": 0, "data": null }` when the person is not in PDL — not an HTTP error, and **not billed**. Switching from name+domain to LinkedIn URL (or vice versa) will **not** help when `data` is null.
+
+**Coverage:** Strong for startup founders and US tech professionals. Some well-known executives (e.g. Dario Amodei, Tobi Lutke, Andrej Karpathy) are absent entirely — no lookup method will find them.
+
+**`is_primary` staleness:** `is_primary: true` marks the most recently updated job in PDL's graph, not necessarily the person's current primary employer. Board seats and advisory roles updated recently rank above older full-time roles. Always verify against the full `experience` array when the top-level `job_title` looks wrong.
+
+**PII:** Responses for public figures may include personal emails, phone numbers, and home addresses. Handle output accordingly.
+
+---
+
+# Exa API (Web Search & Research)
+
+## POST /api/exa/search
+Semantic web search for finding relevant pages.
+Price: $0.01 per request
+
+Supports an optional `category` parameter to filter results by content type: `"company"`, `"people"`, `"research paper"`, `"news"`, `"pdf"`, `"personal site"`, `"financial report"`. Use `category` for verticals — `type` is search **mode** (`auto`, `fast`, `deep`, ...), not a category. Sending `"type": "news"` is wrong; use `"category": "news"`.
+
+**People/Profile Search Tip**: Prefer `category: "people"` for high-level people or profile searches. This is a fast, cheap way to find people before enriching with FullEnrich or Clado.
+
+**Domain filters:** `includeDomains` and `excludeDomains` must be **full hostnames** (e.g. `"stanford.edu"`, `"github.com"`) — bare TLDs like `"edu"` return errors. **Blocked domains cannot appear in either filter** — returns **400** even in `excludeDomains`. Omit: `reddit.com`, `twitter.com`, `x.com`, `instagram.com`, `facebook.com`, `ebay.com`, `nytimes.com`, `cnn.com`, `reuters.com`, `craigslist.org`. For social data use https://stablesocial.dev; for Reddit/X use dedicated APIs; otherwise search the open web without those domains.
+
+**Blocked `site:` in `query`:** Do not put `site:` on any blocked host above in `query` / `additionalQueries` — those return **400**. For X/Twitter handles or profiles, use a dedicated X API or https://stablesocial.dev, or search the open web without `site:`.
+
+**Anti-pattern — blocked domain in `excludeDomains`:** Junk-site exclusion lists often include `facebook.com` — remove it; blocked hosts cannot be listed even for exclusion.
+```json
+{
+  "query": "Natalia Trushin-Jimenez law office Miami",
+  "category": "company",
+  "excludeDomains": ["yelp.com", "google.com", "linkedin.com"]
+}
+```
+(Wrong: including `"facebook.com"` in `excludeDomains`.)
+
+**X/Twitter Tip**: Exa no longer supports `category: "tweet"`. Do not use Exa for timelines, handles, or reliable tweet retrieval — use a dedicated X/Twitter API. Broad web search without `site:` is fine; do not treat Exa as a Twitter search tool.
+
+Example:
+```json
+{
+  "query": "best practices for building AI agents",
+  "numResults": 5
+}
+```
+
+LinkedIn profile search example:
+```json
+{
+  "query": "hedge fund portfolio manager New York",
+  "category": "people",
+  "numResults": 10
+}
+```
+
+---
+
+## POST /api/exa/find-similar
+Find pages similar to a given URL.
+Price: $0.01 per request
+
+Example:
+```json
+{
+  "url": "https://openai.com",
+  "numResults": 5
+}
+```
+
+---
+
+## POST /api/exa/contents
+Extract content from specific URLs.
+Price: $0.002 per request
+
+Example:
+```json
+{
+  "urls": ["https://example.com"]
+}
+```
+
+---
+
+## POST /api/exa/answer
+Get an AI-generated answer to a question based on web search.
+Price: $0.01 per request
+
+Example:
+```json
+{
+  "query": "What is the capital of France?"
+}
+```
+
+---
+
+# Firecrawl API (Web Scraping)
+
+## POST /api/firecrawl/scrape
+Scrape and extract content from a URL.
+Price: $0.0126 per request
+
+Example:
+```json
+{
+  "url": "https://example.com"
+}
+```
+
+---
+
+## POST /api/firecrawl/search
+Search the web and get scraped results.
+Price: $0.0252 per request
+
+**`limit` max is 10** — requests with `limit > 10` return 400 before payment.
+
+Example:
+```json
+{
+  "query": "best coffee shops",
+  "limit": 5
+}
+```
+
+---
+
+# Clado API (Contact Enrichment)
+
+Note: Clado is useful as a fallback when PDL does not return personal emails or phone numbers. For LinkedIn profile data (experience, education, skills), use Minerva `/api/minerva/enrich` instead.
+
+## POST /api/clado/contacts-enrich
+Enrich contact information from LinkedIn URL, email, or phone number. Must provide exactly one of: linkedin_url, email, or phone.
+Price: $0.20 per request
+
+Example:
+```json
+{
+  "linkedin_url": "https://www.linkedin.com/in/satyanadella"
+}
+```
+
+---
+
+# Serper API (Google Search)
+
+## POST /api/serper/news
+Google News search via Serper.dev.
+Price: $0.04 per request
+
+Example:
+```json
+{
+  "q": "OpenAI funding",
+  "num": 10,
+  "gl": "us",
+  "hl": "en"
+}
+```
+
+---
+
+## POST /api/serper/shopping
+Google Shopping search via Serper.dev.
+Price: $0.04 per request
+
+Example:
+```json
+{
+  "q": "wireless earbuds",
+  "num": 10,
+  "gl": "us",
+  "hl": "en"
+}
+```
+
+---
+
+## POST /api/serper/images
+Google Images search via Serper.dev. Generic public image discovery — products, places, screenshots, anything visual. For headshots/profile photos prefer `/api/serper/people-image-search`, which is tuned for that use case.
+Price: $0.04 per request
+
+Example:
+```json
+{
+  "q": "eiffel tower at night",
+  "num": 10,
+  "gl": "us",
+  "hl": "en"
+}
+```
+
+---
+
+## POST /api/serper/people-image-search
+Google Images search tuned for finding a specific person — headshot/profile-photo candidates when LinkedIn/profile-photo APIs return null or a default avatar. Same backend as `/api/serper/images` but with calling guidance below.
+Price: $0.04 per request
+
+Headshot search guidance:
+- Resolve identity before ranking images when the person is ambiguous. Use FullEnrich, Exa LinkedIn profile search, or Minerva to confirm the profile slug, company, and title; do not rely on name alone.
+- LinkedIn profile photos may be limited to connections, a broader network, or LinkedIn members only. Only public photos are reliably indexable by Google. If a scraper returns `default_avatar: true` or a placeholder, use public non-LinkedIn sources tied to the confirmed identity.
+- If the first image search fails, research the confirmed profile for other disambiguating terms, such as school, city, past employers, projects, or personal sites, then retry Google Images with those terms.
+- Query syntax matters. Start with exact-name and company terms, for example: `"Ryan Sproule" "Merit Systems" LinkedIn headshot` or `"Mason Hall" "Merit Systems" profile photo`.
+- Use `num: 5-10`, `gl: "us"`, and `hl: "en"` for US business profiles unless the user gives another locale.
+- Prefer candidates whose result title/source page matches the person and company, from credible sources such as LinkedIn, the person's own website, company/team pages, RootData, Crunchbase, or news profiles.
+- Prefer square-ish, high-resolution human headshots. Reject obvious logos, default avatars, LinkedIn `videocover`, `feedshare`, cover/banner/background images, and images where the result title points to another person.
+- If no single result is clearly correct, return the top candidates with source URLs and explain the uncertainty.
+
+Example:
+```json
+{
+  "q": "\"Ryan Sproule\" \"Merit Systems\" LinkedIn headshot",
+  "num": 10,
+  "gl": "us",
+  "hl": "en"
+}
+```
+
+---
+
+## POST /api/serper/lens
+Google Lens reverse image search via Serper.dev. Pass a public image URL and get visually similar pages, products, and sources.
+Price: $0.20 per request
+
+Example:
+```json
+{
+  "url": "https://example.com/photo.jpg",
+  "gl": "us",
+  "hl": "en"
+}
+```
+
+---
+
+# Whitepages API (People & Property Search)
+
+## POST /api/whitepages/person-search
+Search for people by name, phone number, or address.
+Price: $0.22 per request
+
+Example:
+```json
+{
+  "first_name": "John",
+  "last_name": "Smith",
+  "state_code": "CA"
+}
+```
+
+---
+
+## POST /api/whitepages/property-search
+Get property ownership, resident, and property details by address.
+Price: $0.22 per request
+
+**Empty result is not an error:** when Whitepages has no indexed record for a valid address, the response is `200` with `{ "result": null }` — not 404. Commercial or newer addresses are often unindexed.
+
+**Field names:** Use `street` (aliases accepted: `address`, `street_line`, `street_line_1`, `street_address`), `state_code` (not `state`), and `zipcode` (aliases: `zip`, `zip_code`, `postal_code`). `street` must be a real address — prompts or placeholders like "Please provide a detailed analysis" are rejected before payment.
+
+Example:
+```json
+{
+  "street": "123 Main St",
+  "city": "San Francisco",
+  "state_code": "CA"
+}
+```
+
+WRONG (legacy names — use aliases above or canonical names):
+```json
+{
+  "street": "123 Main St",
+  "city": "San Francisco",
+  "state": "CA"
+}
+```
+
+---
+
+# Reddit API
+
+IMPORTANT - Two-step pattern for Reddit research:
+1. Use /api/reddit/search to find relevant posts. Responses are lightweight — selftext is truncated to 500 chars.
+   Posts with `selftextTruncated: true` have more content available.
+2. For any post where you need the full text or comments, call /api/reddit/post-comments with the post's permalink.
+   This returns the complete untruncated selftext plus all comments.
+
+This pattern keeps search results small (< 2KB for 10 posts) while letting you drill into specific posts when needed.
+
+## POST /api/reddit/search
+Search Reddit posts by query. Returns truncated previews for efficient browsing.
+Price: $0.02 per request
+
+Example:
+```json
+{
+  "query": "AI agents",
+  "sort": "top",
+  "timeframe": "week",
+  "maxResults": 10
+}
+```
+
+---
+
+## POST /api/reddit/post-comments
+Get a Reddit post's full details and comments. Use this to get untruncated selftext and discussion for posts found via search.
+Price: $0.02 per request
+
+Example:
+```json
+{
+  "url": "https://www.reddit.com/r/AskReddit/comments/abc123/example_post"
+}
+```
+
+---
+
+# Hunter API (Email Verification)
+
+IMPORTANT - Async pattern for Hunter email verification:
+Most verifications return immediately. If Hunter is still processing, the paid POST returns HTTP 202 with a jobId and pollUrl. Do not repeat the paid POST for that email. Poll the free SIWX endpoint with the same wallet until status is "completed" or "failed".
+
+## POST /api/hunter/email-verifier
+Verify email deliverability via Hunter.io. Returns either the final verification result or a pending job response.
+Price: $0.03 per request
+
+Example:
+```json
+{
+  "email": "test@stripe.com"
+}
+```
+
+Pending response:
+```json
+{
+  "jobId": "3c16f7d3-8782-4a47-a033-b12bb0d7a16d",
+  "status": "pending",
+  "pollUrl": "https://stableenrich.dev/api/hunter/email-verifier/jobs/3c16f7d3-8782-4a47-a033-b12bb0d7a16d",
+  "retryAfterSeconds": 5
+}
+```
+
+## GET /api/hunter/email-verifier/jobs/{jobId}
+Poll a pending Hunter verification job. This endpoint is free but requires SIWX authentication from the same wallet that paid for the POST.
+Price: Free (SIWX)
+
+Poll every `retryAfterSeconds` while status is "pending". When status is "completed", read the final verification object from `result`.
+
+---
+
+# Cloudflare Browser Rendering API (Website Crawling)
+
+IMPORTANT - Two-step async pattern for Cloudflare crawl:
+The crawl endpoint is long-running (up to ~2 minutes). It uses an async pattern:
+1. POST /api/cloudflare/crawl — pays and starts the crawl, returns a signed JWT token (202 response)
+2. GET /api/cloudflare/jobs?token=<jwt> — SIWX-authenticated (free), poll until job is complete
+
+Poll every 3–5 seconds. The job typically completes in 30–120 seconds depending on site size and render mode.
+
+## POST /api/cloudflare/crawl
+Start a website crawl. Returns a JWT token to poll for results.
+Price: $0.10 per crawl job
+
+Parameters:
+- `url` (string, required) — starting URL to crawl
+- `limit` (number, default 10, max 25) — maximum pages to crawl
+- `depth` (number, default 1, max 3) — maximum link depth from starting URL
+- `formats` (array, default ["markdown"]) — response formats: "html", "markdown", "json"
+- `render` (boolean, default false) — execute JavaScript when crawling (slower, costs more)
+- `source` (string, optional) — URL discovery: "all", "sitemaps", or "links"
+- `options` (object, optional) — crawl scope:
+  - `includeExternalLinks` (boolean) — follow links to external domains
+  - `includeSubdomains` (boolean) — follow links to subdomains
+  - `includePatterns` (string[]) — wildcard patterns for URLs to include
+  - `excludePatterns` (string[]) — wildcard patterns for URLs to exclude (higher priority)
+
+Example:
+```json
+{
+  "url": "https://example.com",
+  "limit": 5,
+  "depth": 1,
+  "formats": ["markdown"]
+}
+```
+
+Response (202):
+```json
+{ "token": "<signed-jwt>" }
+```
+
+---
+
+## GET /api/cloudflare/jobs?token=<jwt>
+Poll crawl job status. Requires SIWX wallet authentication (same wallet that paid). Free — no x402/MPP payment.
+
+Use `mcp__agentcash__fetch_with_auth` (not `fetch`) for this endpoint.
+
+Response shape (Cloudflare's result returned directly):
+```json
+{
+  "id": "<jobId>",
+  "status": "<cf-status-string>",
+  "records": [
+    {
+      "url": "https://example.com/page",
+      "status": "completed",
+      "markdown": "...",
+      "metadata": { "status": 200, "url": "...", "title": "..." }
+    }
+  ],
+  "total": 10,
+  "finished": 8,
+  "skipped": 2,
+  "browserSecondsUsed": 45.2,
+  "cursor": "..."
+}
+```
+
+Page `status` values: `queued` | `completed` | `errored` | `disallowed` | `skipped` | `cancelled`
+
+To determine completion, check `result.finished + result.skipped >= result.total` or poll until no pages remain `queued`.
+
+Full polling workflow:
+```
+1. token = fetch POST /api/cloudflare/crawl  →  response.token
+2. loop:
+     result = fetch_with_auth GET /api/cloudflare/jobs?token={token}
+     if result.finished + result.skipped >= result.total → done, use result.records
+     else → wait 3-5s, repeat
+```
+
+---
+
+# Minerva API (Person Identity & Enrichment)
+
+Minerva is a consumer identity graph. Use it to resolve person identities to unique Minerva PIDs, enrich profiles with demographics/work/contact data, validate emails, and infer country from contact signals.
+
+**Recommended workflow:**
+1. Use `/api/minerva/resolve` to match a person and get their Minerva PID + LinkedIn URL
+2. Use `/api/minerva/enrich` with the returned PID for instant, comprehensive enrichment
+3. Use `/api/minerva/validate-emails` to pre-screen emails before resolve/enrich
+
+**Minerva vs B2B providers:** Minerva excels at consumer profiles (demographics, income/wealth estimates, address history, life events). FullEnrich/CompanyEnrich/PDL excel at B2B/professional data. Use Minerva when you need personal contact info, financial signals, or household data.
+
+## POST /api/minerva/resolve
+Resolve person identity to a Minerva PID and LinkedIn URL. Supports fuzzy matching (name + contact info) and reverse lookup (email or phone only, no name required).
+Price: $0.02 per request
+
+Standard fuzzy match example:
+```json
+{
+  "records": [
+    {
+      "record_id": "user_001",
+      "first_name": "John",
+      "last_name": "Smith",
+      "emails": ["[email protected]"]
+    }
+  ]
+}
+```
+
+Reverse lookup (email only, no name needed):
+```json
+{
+  "records": [{ "record_id": "user_002", "emails": ["[email protected]"] }]
+}
+```
+
+Use `match_condition_fields: ["linkedin_url"]` to only return matches that have a LinkedIn profile.
+
+---
+
+## POST /api/minerva/enrich
+Enrich person records with demographics, work history, education, contact info (emails + phones), address history, financial signals (income/wealth range), relatives, and social profiles.
+Price: $0.05 per request
+
+Three lookup modes — by Minerva PID (fastest), by LinkedIn URL, or by name/email/phone:
+```json
+{
+  "records": [
+    { "record_id": "user_001", "minerva_pid": "p-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" },
+    { "record_id": "user_002", "linkedin_url": "https://www.linkedin.com/in/janedoe" },
+    { "record_id": "user_003", "first_name": "John", "last_name": "Smith", "emails": ["[email protected]"] }
+  ],
+  "return_fields": ["full_name", "personal_emails", "phones", "work_experience"]
+}
+```
+
+Use `return_fields` to limit response size. Use `match_condition_fields` (e.g., `["emails", "phone"]`) to only return matches that have specific data.
+
+---
+
+## POST /api/minerva/validate-emails
+Check if email addresses exist in the Minerva database. Returns validation status and last-seen timestamp. Use before resolve/enrich to pre-screen lists.
+Price: $0.01 per request
+
+```json
+{
+  "records": ["[email protected]", "[email protected]"]
+}
+```
+
+---
+
+# Common Features
+
+## Field Filtering
+Most endpoints support an `excludeFields` parameter to reduce response size by omitting specific fields. Pass an array of field paths to exclude; nested paths use a colon (`:`) separator, e.g. `["email", "organization:technologies"]`. Google Maps endpoints default to excluding "photos" - pass an empty array to include them.
+
+**FullEnrich people-search:** Default lean shape already omits `employment.all` and dedupes companies. Use `excludeFields` to further trim person fields (e.g. `["educations", "skills", "languages"]`). `excludeFields` filters each item in `people[]`, not the top-level `companies` map.
+
+## Pagination
+- FullEnrich **company-search**: use `search_after` cursor from `metadata` — do **not** use `page` (silently ignored on cache hits). FullEnrich **people-search**: use `offset` and `search_after` for deep pages (10 results per query).
+- Google Maps search endpoints support pagination via `pageToken` (returned as `nextPageToken` in responses). **Every page request must repeat the full original body including `textQuery`.** `pageToken` is only valid for the search that produced it — never reuse across different queries.
+- Exa search supports `numResults` up to 100.
+
+## Error Handling
+All endpoints return standard HTTP status codes. Payment-required responses (402) include x402/MPP payment instructions in headers. On server errors (5xx), payments are not settled.
+
+---
+
+# Pricing Summary
+
+| Endpoint | Price |
+|----------|-------|
+| Google Maps Text Search (Full) | $0.08 |
+| Google Maps Text Search (Partial) | $0.02 |
+| Google Maps Nearby Search (Full) | $0.08 |
+| Google Maps Nearby Search (Partial) | $0.02 |
+| Google Maps Place Details (Full) | $0.05 |
+| Google Maps Place Details (Partial) | $0.02 |
+| Google Solar Building Insights | $0.02 |
+| Google Solar Data Layers | $0.08 |
+| Google Aerial View Lookup Video | $0.01 |
+| Google Aerial View Render Video | $0.01 |
+| FullEnrich Company Search | $0.15 |
+| FullEnrich People Search | $0.15 |
+| CompanyEnrich Org Enrich | $0.06 |
+| PDL People Enrich | $0.28 |
+| Exa Search | $0.01 |
+| Exa Find Similar | $0.01 |
+| Exa Contents | $0.002 |
+| Exa Answer | $0.01 |
+| Firecrawl Scrape | $0.0126 |
+| Firecrawl Search | $0.0252 |
+| Clado Contacts Enrich | $0.20 |
+| Serper News | $0.04 |
+| Serper Shopping | $0.04 |
+| Serper Images | $0.04 |
+| Reddit Search | $0.02 |
+| Reddit Post Comments | $0.02 |
+| Whitepages Person Search | $0.22 |
+| Whitepages Property Search | $0.22 |
+| Hunter Email Verifier (start) | $0.03 |
+| Hunter Email Verifier Jobs (poll) | Free (SIWX) |
+| Minerva Resolve | $0.02 |
+| Minerva Enrich | $0.05 |
+| Minerva Validate Emails | $0.01 |
+| Cloudflare Crawl (start) | $0.10 |
+| Cloudflare Jobs (poll) | Free (SIWX) |

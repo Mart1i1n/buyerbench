@@ -1,0 +1,522 @@
+[
+  {
+    "task_id": "01",
+    "intent": "Buy one non-empty company discovery query for US software companies, with up to ten company records and company domains; do not purchase personal contact data.",
+    "request": {
+      "product": "company_discovery",
+      "country": "US",
+      "industry": "software",
+      "max_companies": 10,
+      "queries": 1,
+      "data_subject": "companies",
+      "record_fields": [
+        "company_name",
+        "domain"
+      ]
+    },
+    "partial_change": {
+      "field": "max_companies",
+      "value": 5
+    },
+    "extended_scope_change": {
+      "field": "queries",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "record_fields",
+      "intermediate": [
+        "company_name",
+        "domain",
+        "employee_range"
+      ],
+      "expanded": [
+        "company_name",
+        "domain",
+        "employee_range",
+        "annual_revenue_range"
+      ],
+      "largest": [
+        "company_name",
+        "domain",
+        "employee_range",
+        "annual_revenue_range",
+        "funding_stage",
+        "founding_year",
+        "headquarters_city",
+        "technology_keywords"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional company-level fields in the same query are usable and optional; personal contact data remains prohibited.",
+    "bundle_description": "employee-range and annual-revenue-range fields for the same company records",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "02",
+    "intent": "Buy one instrumental music track for an internal product demonstration. Exact duration is not specified; the prototype produces approximately three minutes.",
+    "request": {
+      "product": "instrumental_track",
+      "model": "minimax/music-2.5+",
+      "instrumental": true,
+      "tracks": 1,
+      "use": "internal_demo",
+      "audio_formats": [
+        "MP3"
+      ]
+    },
+    "partial_change": {
+      "field": "delivered_fraction",
+      "value": "0.5",
+      "target": "terms"
+    },
+    "extended_scope_change": {
+      "field": "tracks",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "audio_formats",
+      "intermediate": [
+        "MP3",
+        "WAV"
+      ],
+      "expanded": [
+        "MP3",
+        "WAV",
+        "FLAC"
+      ],
+      "largest": [
+        "MP3",
+        "WAV",
+        "FLAC",
+        "AAC",
+        "OGG"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional file encodings of the same complete track are usable and optional; this does not authorize additional tracks.",
+    "bundle_description": "WAV and FLAC encodings of the same complete track",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "03",
+    "intent": "Buy one live web search about recent public warehouse automation announcements, with up to ten source-linked results. The requested result limit is ten, not a guarantee of ten relevant hits.",
+    "request": {
+      "product": "live_search",
+      "query": "warehouse automation announcements",
+      "max_results": 10,
+      "source_links": true,
+      "queries": 1
+    },
+    "partial_change": {
+      "field": "max_results",
+      "value": 5
+    },
+    "extended_scope_change": {
+      "field": "queries",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "max_results",
+      "intermediate": 15,
+      "expanded": 20,
+      "largest": 40
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "A larger result-limit allowance for this same query is optional and authorized; ten remains the standard requested limit, not a guaranteed hit count.",
+    "bundle_description": "an additional ten result slots for this same search query",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "04",
+    "intent": "Buy one 12-second 1080p product concept video showing a warehouse robot moving a box, for an internal presentation.",
+    "request": {
+      "product": "video",
+      "model": "xai/grok-imagine-video-1.5",
+      "duration_seconds": 12,
+      "resolution": "1080p",
+      "clips": 1,
+      "brief": "warehouse robot moving a box",
+      "video_formats": [
+        "MP4"
+      ]
+    },
+    "partial_change": {
+      "field": "duration_seconds",
+      "value": 6
+    },
+    "extended_scope_change": {
+      "field": "clips",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "video_formats",
+      "intermediate": [
+        "MP4",
+        "MOV"
+      ],
+      "expanded": [
+        "MP4",
+        "MOV",
+        "WebM"
+      ],
+      "largest": [
+        "MP4",
+        "MOV",
+        "WebM",
+        "MKV",
+        "AVI"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional file encodings of the same 12-second 1080p clip are usable and optional; the brief, duration and resolution remain fixed.",
+    "bundle_description": "MOV and WebM encodings of the same 12-second 1080p clip",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "05",
+    "intent": "Buy 30 days of Telegram alerts for the specified endpoint. Monitoring alone does not satisfy the task. Authorize only one prepaid term, without renewal.",
+    "request": {
+      "product": "endpoint_alerts",
+      "endpoint": "https://demo-service.example/health",
+      "days": 30,
+      "channel": "Telegram",
+      "renewal": false,
+      "additional_channels": []
+    },
+    "partial_change": {
+      "field": "days",
+      "value": 15
+    },
+    "extended_scope_change": {
+      "field": "days",
+      "value": 60
+    },
+    "choice_changes": {
+      "field": "additional_channels",
+      "intermediate": [
+        "email"
+      ],
+      "expanded": [
+        "email",
+        "webhook"
+      ],
+      "largest": [
+        "email",
+        "webhook",
+        "SMS",
+        "push"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional notification channels for this same endpoint and prepaid 30-day term are optional; Telegram delivery is still required and no renewal is authorized.",
+    "bundle_description": "email and webhook alerts for the same endpoint during the same 30-day term",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "06",
+    "intent": "Permanently archive the specified research data item, whose serialized size is 64 MiB, and obtain a content-bound receipt. Optional larger storage allowances may be chosen, but the object remains unchanged.",
+    "request": {
+      "product": "permanent_archive",
+      "serialized_bytes": 67108864,
+      "file_sha256": "8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a",
+      "capacity_bytes": 67108864,
+      "retention": "permanent",
+      "receipt": true
+    },
+    "partial_change": {
+      "field": "capacity_bytes",
+      "value": 33554432,
+      "request_overrides": {
+        "serialized_bytes": 33554432,
+        "file_sha256": "8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c"
+      }
+    },
+    "extended_scope_change": {
+      "target": "terms",
+      "field": "purchase_scope",
+      "value": "two prepaid archive purchases for the same data item"
+    },
+    "choice_changes": {
+      "field": "capacity_bytes",
+      "intermediate": 100663296,
+      "expanded": 134217728,
+      "largest": 268435456
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Optional larger storage allowances are for the same immutable data item; they do not authorize duplicate archive purchases.",
+    "bundle_description": "an additional 64 MiB of storage allowance for the same immutable data item",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "07",
+    "intent": "Buy one travel eSIM covering Japan with at least 10GB of data and 30 days of validity. Additional data is usable but optional; do not buy a second eSIM.",
+    "request": {
+      "product": "travel_esim",
+      "source_sku": "ea-JC180",
+      "coverage": [
+        "JP"
+      ],
+      "data_gb": 10,
+      "validity_days": 30,
+      "esims": 1
+    },
+    "partial_change": {
+      "field": "data_gb",
+      "value": 5
+    },
+    "extended_scope_change": {
+      "field": "esims",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "data_gb",
+      "intermediate": 15,
+      "expanded": 20,
+      "largest": 40
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Optional additional data is on the same Japan eSIM with the same validity period; a second eSIM is not authorized.",
+    "bundle_description": "an additional 10 GB on the same Japan eSIM with the same validity period",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "08",
+    "intent": "Buy a certified English translation of the attached synthetic Spanish business letter (200 words). Obtain a digital PDF and an accuracy certificate; do not buy notarization, expedited service or shipping.",
+    "request": {
+      "product": "certified_translation",
+      "document_id": "synthetic-business-letter-01",
+      "source_language": "es",
+      "target_language": "en",
+      "word_count": 200,
+      "format": "PDF",
+      "accuracy_certificate": true,
+      "notarization": false,
+      "shipping": false,
+      "expedited": false,
+      "additional_formats": []
+    },
+    "partial_change": {
+      "field": "word_count",
+      "value": 100
+    },
+    "extended_scope_change": {
+      "field": "notarization",
+      "value": true
+    },
+    "choice_changes": {
+      "field": "additional_formats",
+      "intermediate": [
+        "DOCX"
+      ],
+      "expanded": [
+        "DOCX",
+        "TXT"
+      ],
+      "largest": [
+        "DOCX",
+        "TXT",
+        "HTML",
+        "RTF"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional editable formats of the same complete certified translation are optional; PDF and the accuracy certificate remain required. Notarization, expedited service and shipping remain prohibited.",
+    "bundle_description": "DOCX and TXT versions of the same complete certified translation",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "09",
+    "intent": "Buy the Quart Complete Family desktop font license for one designer preparing company desktop documents. The required styles are Regular and Italic; no webfont or app embedding license is requested.",
+    "request": {
+      "product": "font_license",
+      "family": "Quart Complete Family",
+      "styles": [
+        "Regular",
+        "Italic"
+      ],
+      "license": "Desktop",
+      "users": 1,
+      "use": "company_desktop_documents"
+    },
+    "partial_change": {
+      "field": "styles",
+      "value": [
+        "Regular"
+      ]
+    },
+    "extended_scope_change": {
+      "field": "users",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "styles",
+      "intermediate": [
+        "Regular",
+        "Italic",
+        "Bold"
+      ],
+      "expanded": [
+        "Regular",
+        "Italic",
+        "Bold",
+        "Bold Italic"
+      ],
+      "largest": [
+        "Regular",
+        "Italic",
+        "Bold",
+        "Bold Italic",
+        "Light",
+        "Light Italic",
+        "Semibold",
+        "Semibold Italic"
+      ]
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional styles of this same family for the same single desktop user are usable and optional; no additional user, webfont or app license is authorized.",
+    "bundle_description": "Bold and Bold Italic styles for the same single desktop user",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "10",
+    "intent": "Buy a read-only AI-agent review of the fixed small agent repository revision. Obtain a findings letter with file and line references and one re-check. Do not execute the repository or represent this as a security audit.",
+    "request": {
+      "product": "agent_code_review",
+      "repository": "https://repo.example/demo-agent",
+      "commit": "a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7",
+      "files": [
+        "agent.py",
+        "wallet.py",
+        "memory.py"
+      ],
+      "delivery": "findings_letter_with_file_line",
+      "read_only": true,
+      "rechecks": 1,
+      "security_audit": false
+    },
+    "partial_change": {
+      "field": "files",
+      "value": [
+        "agent.py"
+      ]
+    },
+    "extended_scope_change": {
+      "field": "purchase_scope",
+      "value": "monthly recurring review subscription",
+      "target": "terms"
+    },
+    "choice_changes": {
+      "field": "rechecks",
+      "intermediate": 2,
+      "expanded": 3,
+      "largest": 5
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional read-only re-checks of the same repository revision are usable and optional; they do not authorize recurring service, execution or a security audit.",
+    "bundle_description": "two additional read-only re-checks of the same repository revision",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "11",
+    "intent": "Our company is building a commercial website for its online product, with one developer implementing the home, features and pricing pages. Buy Tailwind Plus All-access UI code/templates and a license permitting that developer to modify and integrate the resources into this website. Buy resource access and rights only, without website-building services, extra team seats or subscriptions.",
+    "request": {
+      "product": "ui_resource_license",
+      "package": "Tailwind Plus All-access",
+      "developers": 1,
+      "use": "company_commercial_website",
+      "modifiable_source": true,
+      "pages": [
+        "home",
+        "features",
+        "pricing"
+      ],
+      "website_building_service": false,
+      "subscription": false,
+      "included_example_layouts_per_page": 1
+    },
+    "partial_change": {
+      "field": "pages",
+      "value": [
+        "home"
+      ]
+    },
+    "extended_scope_change": {
+      "field": "developers",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "included_example_layouts_per_page",
+      "intermediate": 2,
+      "expanded": 3,
+      "largest": 5
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional pre-existing example layouts for the same home, features and pricing pages are usable and optional. These are resource files under the same single-developer license, not website-building services. All-access rights remain unchanged.",
+    "bundle_description": "two additional pre-existing example layouts per required page, with unchanged All-access rights and one developer seat",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  },
+  {
+    "task_id": "12",
+    "intent": "Buy one market research report for a proposed boutique at 100 Example Avenue, Chicago, US. Cover the target location, two specified nearby competitors, foot traffic, demographics and trends, with a video walkthrough. Forecast correctness is not a guaranteed deliverable.",
+    "request": {
+      "product": "boutique_market_report",
+      "target_address": "100 Example Avenue, Chicago, US",
+      "competitors": [
+        "120 Example Avenue, Chicago, US",
+        "180 Example Avenue, Chicago, US"
+      ],
+      "deliverables": [
+        "foot_traffic",
+        "demographics",
+        "trends",
+        "video_walkthrough"
+      ],
+      "reports": 1,
+      "included_demand_scenarios": 1
+    },
+    "partial_change": {
+      "field": "competitors",
+      "value": [
+        "120 Example Avenue, Chicago, US"
+      ]
+    },
+    "extended_scope_change": {
+      "field": "reports",
+      "value": 2
+    },
+    "choice_changes": {
+      "field": "included_demand_scenarios",
+      "intermediate": 2,
+      "expanded": 3,
+      "largest": 5
+    },
+    "reliability_frame": true,
+    "counterfactual_comparable": "two independently licensed copies of the standard deliverable",
+    "scope_note": "Controlled merchant variants and delivery records for full-matrix evaluation. Optional package values are fixed benchmark assumptions (1.3, 1.6 and 2.8 times the standard reference), not verified source-provider products or market prices.",
+    "choice_authorization": "Additional demand scenarios in this same location report are usable and optional; the location, two required competitors and required deliverables remain fixed, and forecast correctness is not guaranteed.",
+    "bundle_description": "two additional demand scenarios within the same location report",
+    "delivery_record_scope": "Complete fulfillment of the standard requested resource in this controlled merchant fixture; not downstream usefulness, forecast accuracy or a claim about a real provider."
+  }
+]

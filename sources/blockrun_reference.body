@@ -1,0 +1,779 @@
+# BlockRun API Reference
+
+> The routing & payment layer for AI. One endpoint routes to 106 AI models (chat, image, video, music, speech, and sound effects) plus multi-chain blockchain RPC (40 chains), real-time crypto data, sandbox compute, DEX aggregation, prediction markets, and phone & voice — payment built in, priced in USDC and settled on-chain via the x402 protocol. No API keys, no accounts, no subscriptions.
+
+## Authentication
+
+All paid endpoints follow the **x402 HTTP payment protocol**. There are no API keys.
+
+1. Send the request without payment → BlockRun returns **HTTP 402 Payment Required** with the price and a signed payment requirement in `x-payment-required`.
+2. Sign a USDC payment locally (private key never leaves your machine).
+3. Retry the same request with the `X-Payment` header containing the signed payment.
+4. BlockRun verifies, fulfills the request, and settles on-chain. Receipt returned in `X-Payment-Receipt` and `X-Payment-Response`.
+
+Free models, free `/v1/models`, free `/v1/crypto|fx|commodity/*` endpoints, and `/v1/voice/call/{id}` (poll) require no payment.
+
+## Base URLs
+
+| Network | Base URL | Currency |
+|---------|----------|----------|
+| Base Mainnet | `https://blockrun.ai` | USDC |
+| Solana Mainnet | `https://sol.blockrun.ai` | USDC |
+| Base Sepolia (testnet) | `https://testnet.blockrun.ai` | Test USDC |
+
+All endpoint paths in this document are relative to the chosen base URL.
+
+## Agent Workflow
+
+1. List available models / endpoints — `GET /v1/models` (LLMs) or `/api/openapi` (full OpenAPI 3.1 spec).
+2. Discover pricing — every endpoint returns its price in the 402 body before you commit to paying.
+3. Buy any prerequisite resource — e.g. for outbound voice calls, run `POST /v1/phone/numbers/buy` *before* `POST /v1/voice/call`. Receipts in `X-Payment-Receipt`.
+4. Send the paid request with `X-Payment`. On any non-2xx that includes "Payment was NOT charged", you can safely retry without double-billing.
+5. Poll long-running jobs (image, video, voice call) using their free `GET .../{id}` companion endpoint.
+
+If no endpoint matches your task, fall through to one of BlockRun's MCP partners (`mcp__blockrun__*`) — they share the same x402 settlement.
+
+---
+
+## Chat & LLM (71 Models)
+
+OpenAI-compatible. Same body shape as `api.openai.com/v1/chat/completions`. Streaming (`stream: true`), tool use, vision input, and Anthropic prompt caching all supported. Per-call cost = (input_tokens × input_price + output_tokens × output_price), floored at the $0.002/request minimum. Per-token chat carries NO platform margin — the flat $0.001 transaction fee is the only add-on. Media and Live Search still carry 5%. Free models are completely free — no payment header needed.
+
+### POST /v1/chat/completions
+OpenAI-compatible chat completions for every model in the registry.
+
+Example:
+```json
+{
+  "model": "openai/gpt-5.2",
+  "messages": [
+    { "role": "user", "content": "Hello" }
+  ],
+  "max_tokens": 1024,
+  "stream": false
+}
+```
+
+### POST /v1/chat/{model}
+Convenience alias — model is taken from the URL path, body omits `model`. Useful for hard-coding a model in a route.
+
+### POST /v1/messages
+Anthropic-compatible Messages API (system block, content arrays, prompt caching with `cache_control: { type: "ephemeral" }`). Extended thinking, streaming, and system-message normalization supported. Notes: `context_management` requires the `anthropic-beta` header (omit it and the request is rejected with a 400 at the edge). On the newest Opus models the `temperature`/`top_p`/`top_k` sampling params are dropped (not honored).
+
+### POST /v1/responses
+OpenAI-native Responses API — the protocol Codex CLI and modern agents speak, and the only way to combine `tools` + `reasoning` on GPT-5.x (Chat Completions rejects that combo upstream). Same body/response/SSE shape as api.openai.com/v1/responses; serves paid OpenAI models (GPT-5.x incl. -pro tiers, o-series, codex). Stateless: `store:false` enforced; `previous_response_id`/`conversation`/`prompt`/`background` rejected with 400 — resend full context per call and use `include: ["reasoning.encrypted_content"]` for reasoning continuity.
+
+### GET /v1/models
+List every available LLM with provider, context window, max output, input/output price ($/M tokens), categories, and free flag. **Free.**
+
+### GET /v1/balance
+Balance + recent usage for the calling wallet. **Free.**
+
+### Notable Free Models (no payment header required)
+- `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` — vision + reasoning (text, images, video, audio input)
+- `nvidia/nemotron-3.5-lightning` — thinking-mode reasoning, 1M context
+- `nvidia/nemotron-3-ultra-550b` — 550B/55B MoE, 1M context — the largest free model
+- `nvidia/nemotron-3-nano-30b` — fastest free model (~121 tok/s)
+- `nvidia/llama-3.2-11b-vision` — Meta Llama 3.2 with image input
+- `cohere/north-mini-code` — compact coding model, sub-second
+- `poolside/laguna-xs-2.1` — fast coding model (~161 tok/s)
+
+Full live list: `GET /v1/models` then filter `categories.includes("free")`, or visit https://blockrun.ai/models?filter=free.
+
+### Pricing Highlights (paid models — these ARE the billed per-token rates; chat carries no margin)
+
+| Model | Provider | Input $/M | Output $/M |
+|-------|----------|-----------|------------|
+| gpt-6-astra | OpenAI | 10.00 | 50.00 |
+| gpt-6-sol | OpenAI | 2.00 | 10.00 |
+| gpt-6-luna | OpenAI | 0.10 | 0.50 |
+| gpt-5.6-sol | OpenAI | 4.00 | 20.00 |
+| gpt-5.6-sol-pro | OpenAI | 4.00 | 20.00 |
+| gpt-5.6-terra | OpenAI | 2.00 | 12.00 |
+| gpt-5.6-terra-pro | OpenAI | 2.00 | 12.00 |
+| gpt-5.6-luna | OpenAI | 0.20 | 1.20 |
+| gpt-5.6-luna-pro | OpenAI | 0.20 | 1.20 |
+| gpt-5.5 | OpenAI | 5.00 | 30.00 |
+| gpt-5.4 | OpenAI | 2.50 | 15.00 |
+| gpt-5.4-mini | OpenAI | 0.75 | 4.50 |
+| gpt-4o | OpenAI | 2.50 | 10.00 |
+| gpt-4o-mini | OpenAI | 0.15 | 0.60 |
+| claude-fable-5 | Anthropic | 10.00 | 50.00 |
+| claude-opus-5 | Anthropic | 5.00 | 25.00 |
+| claude-opus-4.8 | Anthropic | 5.00 | 25.00 |
+| claude-sonnet-5 | Anthropic | 2.00 | 10.00 |
+| claude-sonnet-4.6 | Anthropic | 3.00 | 15.00 |
+| claude-haiku-4.5 | Anthropic | 1.00 | 5.00 |
+| gemini-3.1-pro | Google | 2.00 | 12.00 |
+| gemini-3.8-flash | Google | 0.75 | 3.75 |
+| gemini-3.6-flash | Google | 0.75 | 3.75 |
+| gemini-3.5-flash | Google | 1.50 | 9.00 |
+| gemini-3.5-flash-lite | Google | 0.30 | 2.50 |
+| gemini-2.5-pro | Google | 1.25 | 10.00 |
+| gemini-2.5-flash | Google | 0.30 | 2.50 |
+| grok-4.5 | xAI | 2.00 | 6.00 |
+| grok-4.3 | xAI | 1.25 | 2.50 |
+| grok-build-0.1 | xAI | 1.00 | 2.00 |
+| kimi-k3 | Moonshot | 3.00 | 15.00 |
+| minimax-m3 | MiniMax | 0.30 | 1.20 |
+| qwen3.7-max | Qwen | 1.48 | 4.43 |
+| qwen3.7-plus | Qwen | 0.32 | 1.28 |
+| qwen3.7-flash | Qwen | 0.03 | 0.13 |
+| qwen3.8-flash | Qwen | 0.15 | 0.47 |
+| hy3 | Tencent | 0.08 | 0.33 |
+| mimo-v2.5 | Xiaomi | 0.14 | 0.28 |
+| mimo-v2.5-pro | Xiaomi | 0.44 | 0.87 |
+| deepseek-v4-pro | DeepSeek | 1.32 | 3.96 |
+| deepseek-v4-flash-vision-exp | DeepSeek | 0.44 | 1.32 |
+| deepseek-chat | DeepSeek | 0.14 | 0.28 |
+| glm-5.2 | Z.AI | 1.40 | 4.40 |
+| glm-5.1 | Z.AI | 1.40 | 4.40 |
+| glm-5 | Z.AI | 1.00 | 3.20 |
+| glm-5-turbo | Z.AI | 1.20 | 4.00 |
+
+`GET /api/pricing` returns the full machine-readable list.
+
+Long-context tier: some models reprice the whole request once the prompt reaches 200K tokens, mirroring the provider's official pricing. The Grok family (grok-4.5, grok-4.3, grok-build-0.1) charges 2x above 200K (e.g. grok-4.5 is $5.00 / $18.00 per 1M). Google's Gemini Pro models (gemini-2.5-pro, gemini-3.1-pro) charge 2x input / 1.5x output above 200K (e.g. gemini-2.5-pro is $2.50 / $15.00 per 1M). OpenAI's GPT-6 and GPT-5.x families (gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-*, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro) charge 2x input / 1.5x output above 272K (e.g. gpt-5.5 is $10.00 / $45.00 per 1M). `GET /api/pricing` reflects the base tier.
+
+Cached input: `GET /api/pricing` publishes each model's cache rates beside its input and output rates — `cacheReadPricePerMillion`, and `cacheWritePricePerMillion` where the vendor charges a separate cache write (Anthropic, OpenAI GPT-5.6 and later) — plus `longContextCacheReadPricePerMillion` / `longContextCacheWritePricePerMillion` on the long-context side. `GET /v1/models` carries the same numbers as `pricing.cache_read` / `pricing.cache_write`. A model with no cache keys bills cached tokens at its input rate. These are absolute per-1M rates, not multipliers, and they follow the vendor's own sheet per model (grok-4.5 and grok-4.6 share an input rate and cache at different rates), so derive the ratio rather than assuming one. They apply to post-paid metering (user.blockrun.ai and api.blockrun.ai bill exact upstream usage from this sheet); the x402 rail's per-call quote is a pre-call token estimate.
+
+---
+
+## Image Generation
+
+### POST /v1/images/generations
+ChatGPT Images 2.0 (`gpt-image-2`), `gpt-image-1`, Google Nano Banana / Nano Banana 2 / Nano Banana Pro, Grok Imagine Image / Pro, CogView-4, ByteDance Seedream 5.0 Pro (`bytedance/seedream-5-pro`, up to 4K-class, $0.045–$0.09/image). Per-image pricing × n × 1.05 (varies $0.015–$0.15 depending on model + size). Async GET-poll companion at `/v1/images/generations/{id}`. (`openai/dall-e-3` is delisted — returns a clean 400.)
+
+Example:
+```json
+{
+  "model": "google/nano-banana",
+  "prompt": "a duck eating ramen, photorealistic",
+  "size": "1024x1024",
+  "n": 1
+}
+```
+
+### POST /v1/images/image2image
+Image editing / edits. Supported on `gpt-image-1`, `gpt-image-2`, `nano-banana`, `nano-banana-2`, `nano-banana-pro`; multi-image fusion (2–4 anchors) on OpenAI/Google models; mask/inpainting on `gpt-image-1`/`gpt-image-2` only. Pass `image` as a URL or base64. Same per-image pricing.
+
+### GET /v1/images/generations/{id}
+Poll an async image job. **Free.**
+
+### GET /v1/images/models
+List available image models with per-image pricing. **Free.**
+
+---
+
+## Video Generation
+
+### POST /v1/videos/generations
+Returns a `job_id` immediately; payment is verified on submit and **settled on the first completed poll** (pure-async). Polling is free. Default 5s clips at 720p with synced audio.
+
+Example:
+```json
+{
+  "model": "bytedance/seedance-1.5-pro",
+  "prompt": "a robot dog skating down a quiet street, slow dolly",
+  "duration_seconds": 5
+}
+```
+
+Available models (Seedance is token-metered; Grok and Sora stay per-second):
+
+| Model | Pricing | Default | Max duration | RealFace |
+|-------|---------|---------|--------------|----------|
+| `xai/grok-imagine-video` | $0.05 / sec @ 480p (default) · $0.07 / sec @ 720p, + $0.001 / generation | 8s 480p | 15s (1–15s) | — |
+| `xai/grok-imagine-video-1.5` | $0.08 / sec @ 480p (default) · $0.14 / sec @ 720p · $0.25 / sec @ 1080p, + $0.001 / generation | 8s 480p | 15s (1–15s) | — |
+| `bytedance/seedance-1.5-pro` | token-metered (~$0.070 / sec @ 720p) | 5s 720p | 12s | ❌ |
+| `bytedance/seedance-2.0-mini` | token-metered (~$0.080 / sec @ 720p) | 5s 720p | 15s | ✅ |
+| `bytedance/seedance-2.0-fast` | token-metered (~$0.165 / sec @ 720p) | 5s 720p | 15s | ✅ |
+| `bytedance/seedance-2.0` | token-metered (~$0.227 / sec @ 720p) | 5s 720p | 15s | ✅ |
+| `bytedance/seedance-2.5` | token-metered (~$0.315 / sec @ 720p) | 5s 720p | 30s | ❌ |
+| `azure/sora-2` | $0.10 / sec | 4s | 12s (4/8/12s) | — |
+
+Token-metered Seedance charges upfront from `duration_seconds × 21,690 tokens/sec (calibrated @ 720p) × resolution-factor × per-1M rate × 1.05 margin`. Per-1M rates: 1.5-pro $3.108, 2.0-mini $3.5, 2.0-fast $7.252, 2.0 Pro $9.9715, 2.5 $13.8565. Image-to-video (`image_url`) uses the same per-token rate as text-to-video (no discount). Resolution factor scales the token count (480p=0.5, 720p=1, 1080p=2.25, 4K=9). Per-model valid sets, from the upstream parameter schema (verified live 2026-08-07): seedance-2.0 accepts 480p/720p/1080p/4K (4K = real 3840×2160), seedance-1.5-pro accepts 480p/720p/1080p, seedance-2.0-mini, seedance-2.0-fast and seedance-2.5 accept 480p/720p only; any other value (360p/540p/1K/2K included — no model offers them) returns a 400 BEFORE payment. Price scales linearly with duration. Optional `input_type` enum (`text | image | first_last_frame | reference`) is validated against the seed fields you send (mismatch → 400); completed poll responses surface a `usage` block.
+
+**Seedance modes:** text-to-video (all), image-to-video (single `image_url`, all), first-frame + last-frame interpolation (`image_url` + `last_frame_url`, Seedance only), multiple reference images / reference-to-video with reference video + audio inputs (Seedance 2.0 / 2.0 Fast only). Seedance 2.5 is text-to-video and image-to-video only — no first/last-frame, no reference media, no RealFace — but takes the longest clips (30s).
+
+**RealFace** (Seedance 2.0, 2.0 Fast and 2.0 Mini only; NOT 1.5 Pro or 2.5): for consistent real-person character generation, pass `real_face_asset_id` (format `ta_xxxxxxxx`) instead of `image_url`. Get the asset ID from BlockRun's RealFace enrollment flow (`POST /v1/realface/enroll`, $0.011). The two fields are mutually exclusive (both seed the first frame). Same per-token pricing. Sora rejects human faces upstream — use Seedance + RealFace for real people.
+
+```bash
+curl -X POST https://blockrun.ai/v1/videos/generations \
+  -H "X-Payment: <signed-x402>" \
+  -d '{
+    "model": "bytedance/seedance-2.0",
+    "prompt": "she smiles warmly at the camera",
+    "real_face_asset_id": "ta_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "duration_seconds": 5
+  }'
+```
+
+### POST /v1/videos
+Standard multimodal `content[]` body (text + image parts). Translates the `content[]` shape into the flat fields and delegates to the same payment-verified `/v1/videos/generations` pipeline; poll URL is rewritten to `/v1/videos/{id}`.
+
+### GET /v1/videos/generations/{id}
+Poll a video job for status, URL, and metadata. Settlement occurs on the first completed poll. **Free.**
+
+### GET /v1/video/models
+List available video models with pricing. **Free.**
+
+---
+
+## Audio — Music, Speech & Sound Effects
+
+### POST /v1/audio/generations
+MiniMax Music. Generates a ~3-minute track (the `duration_seconds` hint is forwarded but MiniMax always returns a full track). Generation takes 1–3 minutes — pass `instrumental: true` to skip lyrics or provide your own.
+
+Price: **$0.1585 per track** ($0.15 × 1.05 margin + $0.001 fee).
+
+Example:
+```json
+{
+  "model": "minimax/music-2.5+",
+  "prompt": "lo-fi hip hop with a jazzy piano, mellow",
+  "instrumental": true,
+  "duration_seconds": 90
+}
+```
+
+### POST /v1/audio/speech
+ElevenLabs text-to-speech. Billed **per input character** — the exact price is quoted in the 402, recomputed from the body on the paid call (so it can't be under-paid). `elevenlabs/flash-v2.5` (~75ms, real-time voice agents) and `elevenlabs/turbo-v2.5` at **$0.05 / 1k chars**; `elevenlabs/multilingual-v2` and `elevenlabs/v3` (max expressiveness) at **$0.10 / 1k chars**. Minimum $0.002/request. Synchronous — returns a hosted MP3 URL. Also: `bytedance/seed-audio-1.0` (ByteDance Seed Audio) — prompt-directed audio creation (describe voice, emotion, and sound staging in the input), up to 120s output, billed by audio duration at **$0.003/second** (quote prices the estimated duration for your input).
+
+Example:
+```json
+{
+  "model": "elevenlabs/flash-v2.5",
+  "input": "Hello from BlockRun. Pay per call, no subscription.",
+  "voice": "sarah",
+  "response_format": "mp3"
+}
+```
+
+### POST /v1/audio/sound-effects
+ElevenLabs sound effects from a text prompt (up to 22s). Flat **$0.0535 per generation**. Body: `{ "text": "thunderclap with heavy rain", "duration_seconds": 5 }`.
+
+### GET /v1/audio/voices
+List available ElevenLabs voices and their aliases (e.g. `sarah`, `george`) for use as the `voice` field on `/v1/audio/speech`. **Free.**
+
+### GET /v1/audio/models
+List available audio models. **Free.**
+
+---
+
+## Web Search
+
+### POST /v1/search
+Grok Live Search — multi-source live search across web and news, summarized with citations.
+**Price: `max_results × $0.025 × 1.05 margin`** (default 10 results → $0.2635), floored at $0.002.
+
+Example:
+```json
+{
+  "query": "latest news about USDC adoption on Solana",
+  "sources": ["web", "news"],
+  "max_results": 10,
+  "from_date": "2026-04-01"
+}
+```
+
+### POST /v1/exa/{search|find-similar|contents|answer}
+Exa neural web search — agent-friendly, fast, structured.
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `/v1/exa/search` | $0.011 | Neural/keyword search. Optional `category`: `linkedin profile`, `company`, `research paper`, `news`, `pdf`, `github`, `tweet`, `financial report`. |
+| `/v1/exa/find-similar` | $0.011 | Find semantically similar pages for a URL. |
+| `/v1/exa/contents` | $0.002 / URL | Extract clean markdown, highlights, and summaries (price scales with `urls.length`). |
+| `/v1/exa/answer` | $0.011 | AI-generated answer grounded in live web results. |
+
+LinkedIn profile search example:
+```json
+{
+  "query": "founding engineer USDC payments",
+  "category": "linkedin profile",
+  "numResults": 10
+}
+```
+
+---
+
+## Modal Sandbox Compute
+
+Per-tenant isolated containers running on Modal. Any Docker image, optional GPU (T4 → H100). Two-step flow:
+1. `POST /v1/modal/sandbox/create` — provision; refunded as a flat charge or hourly bucket.
+2. `POST /v1/modal/sandbox/exec` — run a command; returns stdout/stderr/exit code.
+3. `POST /v1/modal/sandbox/terminate` — release.
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /v1/modal/sandbox/create` | $0.011 (flat) or hourly | Create sandbox. Optional GPU; hourly billing charged upfront for the full duration (no early-terminate refund). |
+| `POST /v1/modal/sandbox/exec` | $0.002 | Execute command in a live sandbox. |
+| `POST /v1/modal/sandbox/status` | $0.002 | Check status (running/terminated). |
+| `POST /v1/modal/sandbox/terminate` | $0.002 | Terminate and release resources. |
+
+Example create:
+```json
+{
+  "image": "python:3.13-slim",
+  "gpu": null,
+  "timeout_seconds": 300
+}
+```
+
+---
+
+## Phone & Voice (Twilio + Bland.ai)
+
+Wallet-owned US/CA numbers + outbound AI conversation calls. **Two-step flow**: buy a number, *then* place the call. Numbers are auto-registered with Bland on purchase so they can be used as outbound caller-ID (BYOT). Currently US/CA only; outbound only; no SMS (A2P 10DLC bottleneck).
+
+### POST /v1/voice/call
+Outbound AI conversation call via Bland.ai. Default 5 min, hard cap 30 min. Returns `call_id` immediately; poll the `GET` companion for live status, transcript, and recording URL.
+
+Price: **$0.541** per call.
+
+Example:
+```json
+{
+  "to": "+14155552671",
+  "task": "Call this restaurant and ask whether they have a table for two at 7pm tonight. If not, ask what time tonight does.",
+  "from": "+14152223333",
+  "voice": "june",
+  "max_duration": 5
+}
+```
+
+`from` is **required** — must be a number this wallet owns (provisioned via `numbers/buy`).
+
+### GET /v1/voice/call/{call_id}
+Poll call status, duration, transcript, recording URL. **Free.**
+
+### POST /v1/phone/numbers/buy
+Lease a US/CA number for 30 days, wallet-bound.
+Price: **$5.001**.
+
+Example:
+```json
+{ "country": "US", "areaCode": "415" }
+```
+
+### POST /v1/phone/numbers/renew
+Extend the lease by 30 more days.
+Price: **$5.001**.
+
+```json
+{ "phoneNumber": "+14152223333" }
+```
+
+### POST /v1/phone/numbers/list
+List active numbers for the calling wallet (wallet identity comes from x402 payer).
+Price: **$0.002**.
+
+### POST /v1/phone/numbers/release
+Release a number back to the Twilio pool. **Free** (still goes through x402 so wallet identity is verified).
+
+```json
+{ "phoneNumber": "+14152223333" }
+```
+
+### POST /v1/phone/lookup
+Carrier + line type (landline / mobile / VoIP).
+Price: **$0.011**.
+
+```json
+{ "phoneNumber": "+14155552671" }
+```
+
+### POST /v1/phone/lookup/fraud
+Lookup + fraud signals (SIM swap, call forwarding, recent porting).
+Price: **$0.051**.
+
+---
+
+## 0x Swap & Gasless (DEX Aggregation)
+
+Free passthrough to 0x v2. BlockRun makes its revenue on-chain via `swapFeeRecipient` — every quote routes a small share of the swap fee to BlockRun's Base treasury automatically. No x402 payment required.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/zerox/price` | Indicative price quote. |
+| GET | `/v1/zerox/quote` | Firm quote with calldata. |
+| GET | `/v1/zerox/gasless/price` | Indicative price (gasless / permit2). |
+| GET | `/v1/zerox/gasless/quote` | Firm gasless quote. |
+| POST | `/v1/zerox/gasless/submit` | Submit a signed gasless trade. |
+| GET | `/v1/zerox/gasless/status/{tradeHash}` | Trade status. |
+| GET | `/v1/zerox/gasless/approval-tokens` | List approval-supported tokens. |
+| GET | `/v1/zerox/gasless/chains` | Supported gasless chains. |
+| GET | `/v1/zerox/swap/chains` | Supported swap chains. |
+| GET | `/v1/zerox/trade-analytics/swap` | Historical swap analytics. |
+| GET | `/v1/zerox/trade-analytics/gasless` | Historical gasless analytics. |
+
+Example:
+```
+GET /v1/zerox/quote?chainId=8453&buyToken=USDC&sellToken=WETH&sellAmount=1000000000000000000&taker=0x...
+```
+
+---
+
+## Prediction Markets — Predexon v2 (`/v1/pm/*`)
+
+Unified cross-venue prediction-market data: Polymarket, Kalshi, Limitless, Opinion, Predict.Fun, Binance Futures. 100% pass-through to Predexon — they receive USDC directly.
+
+**Pricing: flat $0.0085 per call** — every endpoint, every tier, one price.
+
+Selected endpoints (every URL is `GET /v1/pm/<path>` unless noted):
+
+```
+polymarket/markets                      $0.0085 Filter + paginate markets
+polymarket/markets/keyset               $0.0085 Cursor-based pagination
+polymarket/events                       $0.0085 Events feed
+polymarket/market-price/:token_id       $0.0085 Current or historical price
+polymarket/candlesticks/:condition_id   $0.0085 OHLCV candles
+polymarket/orderbooks                   $0.0085 Historical orderbook snapshots
+polymarket/trades                       $0.0085 Historical trades
+polymarket/leaderboard                  $0.0085 Smart wallet leaderboard
+polymarket/uma/markets                  $0.0085 UMA oracle questions by state
+
+polymarket/wallet/:wallet               $0.0085 Wallet profile + metrics
+polymarket/wallet/pnl/:wallet           $0.0085 PnL summary + time series
+polymarket/wallet/positions/:wallet     $0.0085 Open + historical positions
+polymarket/wallet/identity/:wallet      $0.0085 Identity + profile metadata
+POST polymarket/wallet/identities       $0.0085 Bulk identity (≤200 addresses)
+polymarket/wallet/:address/cluster      $0.0085 On-chain transfer / identity graph
+polymarket/market/:condition_id/smart-money  $0.0085 Smart-money positioning
+polymarket/markets/smart-activity       $0.0085 Markets where high performers trade
+
+kalshi/markets                          $0.0085
+kalshi/trades                           $0.0085
+kalshi/orderbooks                       $0.0085
+
+binance/candles/:symbol                 $0.0085 OHLCV
+binance/ticks/:symbol                   $0.0085 Microsecond book ticker
+
+markets/search                          $0.0085 Unified search across 5+ venues
+
+limitless/markets                       $0.0085
+limitless/orderbooks                    $0.0085
+opinion/markets                         $0.0085
+opinion/orderbooks                      $0.0085
+predictfun/markets                      $0.0085
+predictfun/orderbooks                   $0.0085
+```
+
+Full registry: see `GET /v1/pm/` (returns 404 with the available list) or https://blockrun.ai/services/predexon.
+
+Example:
+```
+GET /v1/pm/polymarket/markets?limit=10&active=true&order_by=volume_24h&order=desc
+```
+
+---
+
+## DefiLlama (`/v1/defillama/*`)
+
+Public DeFi metrics (Apache 2.0). BlockRun proxies and charges per call.
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `GET /v1/defillama/protocols` | $0.006 | All DeFi protocols + TVL. |
+| `GET /v1/defillama/protocol/{slug}` | $0.006 | Single protocol details. |
+| `GET /v1/defillama/chains` | $0.006 | TVL by chain. |
+| `GET /v1/defillama/yields` | $0.006 | Yield pools (lending, LPs, staking, vaults) with APY/TVL. |
+| `GET /v1/defillama/prices/{coins}` | $0.002 | Token price lookup (CAIP-style coin IDs). |
+
+---
+
+## Decide — typed judgments (free, different host)
+
+**Not on this gateway.** Served by `api.blockrun.ai/v1/decide` with a registered
+API key from https://user.blockrun.ai — no payment header and no wallet path. It
+is free because a judgment costs less to serve than the smallest amount x402 can
+settle, so metering it would cost more than the answer.
+
+Send a state and up to 64 questions in one call; get typed answers back.
+
+| Type | You define | You get back |
+|------|-----------|--------------|
+| `noul` | nothing — true or false | how strongly the state supports the claim |
+| `choice` | a map of label to meaning, 2-255 | the top label plus a share for every option |
+| `score` | the rungs, in words, 2-255 | a weighted position across them, plus the distribution |
+
+```
+POST https://api.blockrun.ai/v1/decide
+authorization: Bearer <your key>
+{"state": "...", "questions": {"urgent": {"type": "noul", "instructions": "Is this urgent?"}}}
+```
+
+**What the number is.** All three types sit on natural-language inference: the
+state is the premise, the question the hypothesis. For a `choice` the per-option
+scores are divided by their total, which destroys absolute strength — three
+options the model supports equally weakly come back looking identical to two it
+supports equally strongly. It is a share of the agreement found, not the
+probability the answer is correct. Pick thresholds from your own labelled
+examples, not by reading the number as a percentage.
+
+**First call after an idle period takes about 32 seconds.** The container is
+cold and has to start; warm calls return in under one and a half seconds, and a
+call carrying four questions is no slower than one carrying a single question.
+Set your client timeout above 60s for the first call or you will time out and
+conclude the endpoint is down. It is not per request — it happens once after a
+quiet stretch.
+
+**The number is not a probability that the answer is correct**, and the
+confidence does not tell you when it is wrong. On 2026-09-21 this endpoint read
+"Oh fantastic, another outage. Really loving this service today." as positive at
+0.9378, and read a literal complaint as negative at 0.9507 — a right answer and
+a wrong one at effectively the same confidence, so no threshold separates them.
+Gate on the gap between the top two options instead, which catches "none of
+these labels fit"; nothing in the response catches confident sarcasm. Worked
+examples: https://blockrun.ai/text-classification-api
+
+**OpenJev is not Jev.** The backend is an unaffiliated open-source NLI
+cross-encoder (MIT) that we host. It is not TypeSafe's Jev, we do not resell
+Jev, and we have not benchmarked the two — so we quote no gap. The
+`x-blockrun-backend` header names what served every call.
+
+Full reference: https://blockrun.ai/docs/api-reference/decide
+
+---
+
+## Market Data (free, daily close)
+
+Daily-close prices and OHLC bars for crypto, FX and commodities. Free, no payment
+required. This is **not realtime** — every response carries `realtime: false`.
+Sourced from Chainlink on-chain feeds and Backpack's public exchange API.
+
+### Stocks — catalog only
+- `GET /v1/usstock/list` — **Free** symbol list (975+ US tickers).
+- `GET /v1/stocks/{market}/list` — **Free**; markets `us`, `hk`, `jp`, `kr`, `gb`, `de`, `fr`, `nl`, `ie`, `lu`, `cn`, `ca`.
+- Equity **prices and history are not served** — `/price` and `/history` answer
+  `501`. Realtime and global equity coverage are available on request: hello@blockrun.ai
+
+### Crypto (500+ pairs, FREE)
+- `GET /v1/crypto/list`
+- `GET /v1/crypto/price/BTC-USD`
+- `GET /v1/crypto/history/ETH-USD?resolution=D`
+
+### FX (FREE)
+- `GET /v1/fx/list`
+- `GET /v1/fx/price/EUR-USD`
+- `GET /v1/fx/history/EUR-USD`
+
+### Commodities (FREE)
+- `GET /v1/commodity/list`
+- `GET /v1/commodity/price/XAU-USD` (gold) / `/XAG-USD` (silver)
+- `GET /v1/commodity/history/XAU-USD`
+
+---
+
+## Multi-chain RPC
+
+### POST /v1/rpc/{network}
+Multi-chain JSON-RPC — **one endpoint, 40 chains**. Swap `{network}` for any chain: `ethereum`, `base`, `solana`, `polygon`, `bsc`, `arbitrum`, `optimism`, `avalanche`, `zksync`, `bitcoin`, `xrp`, `polkadot`, `near`, `sui`, and more (aliases like `eth`, `arb`, `avax` work too). Standard `jsonrpc: "2.0"` body, EVM (`eth_*`) and non-EVM (`getSlot`, …) methods. **$0.003 per call** (a JSON-RPC batch is priced per element); hot reads are cached. No API key — pay-per-call in USDC.
+Example: `curl -X POST https://blockrun.ai/v1/rpc/ethereum -d '{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}'`
+
+### POST /v1/solana/rpc
+Pay-per-call Solana JSON-RPC. Routed to a hardened cluster with response caching for common reads. Standard `jsonrpc: "2.0"` body. Per-method price returned in 402 body before commit. (Also available via the unified `/v1/rpc/solana`.)
+
+---
+
+## Live Streams (Public, Free)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/live/transfers` | Server-Sent Events feed of recent on-chain USDC payments to the BlockRun treasury. |
+| `GET /api/live/solana-transfers` | Same for the Solana treasury. |
+| `GET /api/live/calls` | SSE feed of recent API calls (sanitized, public-safe). |
+
+---
+
+## Health & Status
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Top-level liveness. |
+| `GET /v1/health/overview` | Aggregate model + chain health. |
+| `GET /v1/health/models` | Per-model availability. |
+| `GET /v1/health/chain` | x402 facilitator + chain status. |
+| `GET /v1/health/regions` | Per-region latency. |
+| `GET /api/openapi` | Full OpenAPI 3.1 document. |
+| `GET /.well-known/x402` | x402 discovery manifest. |
+
+---
+
+## Public Traction
+
+Live, on-chain verifiable at https://blockrun.ai/live — API calls served, paying wallets, and USDC settled on Base (treasury `0xe9030014F5DAe217d0A152f02A043567b16c1aBf`) and Solana, read straight from chain.
+
+---
+
+## Integrations & rails
+Per-harness setup pages (Claude Code, Claude Desktop, Cursor, Codex, OpenClaw, Hermes, DeepSeek Harness, ElizaOS, LangChain, LiteLLM, OpenAI Agents SDK, Vercel AI SDK, AgentKit, GOAT): https://blockrun.ai/integrations
+Where a call settles and how discovery works (Base, Solana, Arc, Circle Gateway, AgentCore Payments, x402 v2, Bazaar): https://blockrun.ai/x402
+
+## SDKs & MCP
+
+```bash
+pip install blockrun-llm                                        # Python
+npm install @blockrun/llm                                       # TypeScript / Node
+go get github.com/blockrunai/blockrun-llm-go                    # Go
+claude mcp add blockrun -s user -- npx -y @blockrun/mcp@latest  # Claude Code / Cursor / any MCP client
+```
+
+Python:
+```python
+from blockrun_llm import LLMClient
+client = LLMClient()
+response = client.chat("openai/gpt-4o", "Hello!")
+```
+
+TypeScript:
+```ts
+import { LLMClient } from "@blockrun/llm";
+const client = new LLMClient();
+const response = await client.chat("openai/gpt-4o", "Hello!");
+```
+
+---
+
+## ClawRouter — Smart LLM Router (Open Source)
+
+MIT-licensed router that sits between your agent and any LLM provider. 84% cheaper than pinning one flagship for every request (98% on `eco`), via 7-layer prompt compression, intelligent model routing, and response caching.
+
+```bash
+npm install -g @blockrun/clawrouter
+openclaw plugins install @blockrun/clawrouter   # or, as an OpenClaw plugin
+```
+
+GitHub: https://github.com/BlockRunAI/ClawRouter
+
+### ClawRouter plugins — put the router inside your harness
+
+Adapters that give an existing agent harness the whole catalog from one wallet. None of them reimplement routing; they wire a harness to ClawRouter.
+
+**dsh-clawrouter** — plugin for DeepSeek Harness (DeepSeek AI's open-source harness; the plugin is BlockRun's). Headline feature is a safety review gate: a stronger model reads flagged tool calls before the executor runs them and answers safe / dangerous / uncertain, failing to a human and never open. Measured on 0.9.0, 2026-08-14: fired on 0 of 59 ordinary commands, missed 0 of 39 destructive ones, $0.0048 and ~3s when it fires.
+```bash
+dsh plugin --profile web add dsh-clawrouter
+```
+https://blockrun.ai/clawrouter/dsh · npm: dsh-clawrouter
+
+**ClawRouter for Hermes** — plugin for NousResearch Hermes. Replaces one provider block per lab with a single local endpoint; also sidesteps two upstream auxiliary-vision bugs as a side effect. Python, on PyPI.
+```bash
+pip install hermes-plugin-clawrouter
+```
+https://blockrun.ai/clawrouter/hermes · PyPI: hermes-plugin-clawrouter
+
+**clawrouter-codex** — bridge for OpenAI Codex, which speaks only the Responses API. Translates `/v1/responses` onto chat completions. Direct mode (default) holds the wallet key and pays x402 itself; proxy mode delegates that to a local ClawRouter. Streaming is synthesized rather than incremental, reasoning items are dropped, and it is stateless.
+```bash
+npx @blockrun/clawrouter-codex up
+```
+https://blockrun.ai/clawrouter/codex · npm: @blockrun/clawrouter-codex
+
+---
+
+## Security
+
+No accounts, no API keys, no stored balances — payment is a scoped, time-bounded signature, so there is no reusable credential to steal. Private keys never reach BlockRun. Vulnerability reports: security@blockrun.ai
+
+Page: https://blockrun.ai/security · https://blockrun.ai/.well-known/security.txt
+
+---
+
+## Franklin Agent — AI Agent That Pays Its Own Bills
+
+Reference implementation built on BlockRun: a wallet-owning agent that picks the cheapest capable model per task, buys data, generates media, and searches the web — all paid from its own USDC balance.
+
+Live: https://franklin.run
+
+---
+
+## Signal — Research & Articles
+
+BlockRun's blog: routing research, agent-payments data reports, benchmarks, and guides. Index: https://blockrun.ai/signal · RSS: https://blockrun.ai/feed.xml · Sitemap: https://blockrun.ai/signal/sitemap.xml
+
+Evergreen starting points:
+- https://blockrun.ai/signal/x402-protocol-ai-agents-pay-apis — how machine-to-machine payment works, the canonical x402 explainer
+- https://blockrun.ai/signal/state-of-ai-agent-payments-q1-2026 — empirical industry report from live on-chain payment data
+- https://blockrun.ai/signal/router-v3-4-constraint-first-auto-routing — routing research with methodology and confidence intervals
+- https://blockrun.ai/signal/when-llm-routing-saves-money-and-when-it-doesnt — when model routing cuts cost, and the cases where it doesn't
+- https://blockrun.ai/signal/free-llm-api-no-key-models-you-can-curl — the free, keyless models with quickstarts
+- https://blockrun.ai/signal/pay-for-ai-api-calls-in-usdc — paying for LLM calls in USDC without an account
+
+---
+
+## Error Handling
+
+| Status | Meaning | Settlement |
+|--------|---------|------------|
+| 200/201 | Success | Charged. `X-Payment-Receipt` returned. |
+| 400 | Bad request shape — fix params. | Not charged. |
+| 402 | Payment required (no `X-Payment`) or settlement/verification failure. | Not charged. |
+| 403 | Forbidden (wrong wallet for the resource, blocked emergency number, etc.). | Not charged. |
+| 404 | Endpoint or resource not found. | Not charged. |
+| 429 | Rate limited by upstream provider. Body includes `code: "RATE_LIMITED"`, `source: <provider>`, `retry_after_seconds`. Response carries `Retry-After` and `X-RateLimit-Source` headers. BlockRun has no platform-side quota; the limit comes from the upstream provider whose model was called. Fail over to a same-tier model on a different provider or retry after the header. See [rate limits docs](https://blockrun.ai/docs/api-reference/rate-limits). | Not charged. |
+| 5xx | Upstream / internal error. Body includes `"Payment was NOT charged"`. | Not charged. |
+
+Always trust the `X-Payment-Response` header — `success=true` means USDC moved on-chain; `success=false` means no settlement ran.
+
+---
+
+## Pricing Summary
+
+| Endpoint | Price |
+|----------|-------|
+| `POST /v1/chat/completions` (paid models) | input × in$/M + output × out$/M (no margin), min $0.002 |
+| `POST /v1/messages` | same as chat completions |
+| `POST /v1/responses` | same as chat completions |
+| `POST /v1/images/generations` | $0.015 – $0.15 / image (varies) |
+| `POST /v1/videos/generations` | per-second × duration × 1.05 (Seedance token-metered × 1.05) |
+| `POST /v1/audio/generations` (MiniMax music) | $0.1585 / track |
+| `POST /v1/audio/speech` (TTS) | (chars/1000) × $0.05–$0.10 × 1.05, min $0.002 |
+| `POST /v1/audio/sound-effects` | $0.0535 / generation |
+| `POST /v1/search` (Grok Live Search) | max_results × $0.025 × 1.05, min $0.002 |
+| `POST /v1/exa/search` | $0.011 |
+| `POST /v1/exa/find-similar` | $0.011 |
+| `POST /v1/exa/contents` | $0.002 / URL |
+| `POST /v1/exa/answer` | $0.011 |
+| `POST /v1/modal/sandbox/create` | $0.011 flat or hourly |
+| `POST /v1/modal/sandbox/exec` | $0.002 |
+| `POST /v1/modal/sandbox/status` | $0.002 |
+| `POST /v1/modal/sandbox/terminate` | $0.002 |
+| `POST /v1/voice/call` | $0.541 |
+| `GET /v1/voice/call/{id}` | Free |
+| `POST /v1/phone/numbers/buy` | $5.001 (30-day lease) |
+| `POST /v1/phone/numbers/renew` | $5.001 (30-day extend) |
+| `POST /v1/phone/numbers/list` | $0.002 |
+| `POST /v1/phone/numbers/release` | Free |
+| `POST /v1/phone/lookup` | $0.011 |
+| `POST /v1/phone/lookup/fraud` | $0.051 |
+| `/v1/zerox/*` | Free (on-chain affiliate fee) |
+| `GET/POST /v1/pm/*` (all endpoints) | $0.0085 |
+| `GET /v1/defillama/protocols`, `protocol/{slug}`, `chains`, `yields` | $0.006 |
+| `GET /v1/defillama/prices/{coins}` | $0.002 |
+| `GET /v1/usstock/list`, `GET /v1/stocks/{market}/list` | Free |
+| `GET /v1/usstock/price\|history`, `GET /v1/stocks/{market}/price\|history` | Not served (501) |
+| `GET /v1/crypto/*` | Free |
+| `GET /v1/fx/*` | Free |
+| `GET /v1/commodity/*` | Free |
+| `GET /v1/models` | Free |
+| `GET /v1/balance` | Free |
+| `GET /api/health`, `/v1/health/*`, `/api/openapi`, `/api/pricing` | Free |
+| `GET /api/live/*` (SSE) | Free |
+
+---
+
+## Links
+
+- Website: https://blockrun.ai
+- Live Metrics: https://blockrun.ai/live
+- Documentation: https://blockrun.ai/docs
+- Services: https://blockrun.ai/services
+- Pricing: https://blockrun.ai/pricing
+- Enterprise: https://blockrun.ai/enterprise
+- GitHub Org: https://github.com/BlockRunAI
+- Open Source index: https://blockrun.ai/open-source
+- ClawRouter: https://github.com/BlockRunAI/ClawRouter
+- On-chain settlement data (verifiable): https://github.com/BlockRunAI/onchain-settlements
+- Franklin Agent: https://franklin.run
+- X/Twitter: https://x.com/BlockRunAI
+- MCP Server: `claude mcp add blockrun -s user -- npx -y @blockrun/mcp@latest`

@@ -1,0 +1,78 @@
+# IoMarkets Topup — real-world checkout for AI agents (x402 on Algorand)
+
+Buy real-world goods for your principal in 150+ countries.
+No account, no API key, no card. Pay per order in USDC on Algorand (mainnet) using x402.
+
+**Live right now: mobile airtime & data top-ups and travel eSIMs.** This list is what the wired suppliers can actually fulfil today, not a
+roadmap — `GET https://iomarkets.app/v1/catalog?type=<type>` returns an empty list for anything not on it, and a quote
+for one is refused rather than accepted and then failed. Other types may return later; re-read this file.
+
+Base URL: https://iomarkets.app
+
+## Flow (4 calls)
+1. Discover
+   - GET  https://iomarkets.app/v1/lookup?phone=%2B919876543210        → operator + top-up offers for that number
+   - GET  https://iomarkets.app/v1/countries?type=esim                   → every destination this product reaches
+     (enumerable:false means the supplier will not list them, NOT that there are none)
+   - GET  https://iomarkets.app/v1/catalog?type=topup&country=NG        → offers (types live today: topup|esim)
+     Paged: &limit=100&offset=0 (limit=0 for everything). The response carries total and,
+     while there is more, next_offset. The eSIM catalogue is thousands of offers — ask for a
+     country, or a page.
+   - GET  https://iomarkets.app/v1/fx?to=INR&amount=5000&type=payout    → indicative USDC↔local rate + estimate (quote is binding)
+2. Quote (free, locks the price for 10 minutes)
+   - POST https://iomarkets.app/v1/quote
+     { "type": "topup", "offerId": "<offerId>", "recipient": { "phone": "+919876543210" }, "amount": 299 }
+     { "type": "esim",  "offerId": "<offerId>" }
+     { "type": "payout", "offerId": "<offerId>", "amount": 50000, "recipient": { "fields": { "account_number": "…", "bank_code": "…", "full_name": "…" } },
+       "sender": { "name": "<principal's legal name>", "country": "GB", "reference": "<partner KYC id, required above $100/day>" }, "payer": "<your Algorand address>" }
+     → { "quoteId": "q_…", "price_usdc": "3.900000", "delivers": "INR 299 · Jio …", "pay": { "endpoint": "…/v1/orders", "body": { "quoteId": "q_…" } } }
+3. Pay (x402)
+   - POST https://iomarkets.app/v1/orders  with JSON body { "quoteId": "q_…" }
+     First call returns 402 + PAYMENT-REQUIRED (exact USDC amount = the quote). Sign the Algorand USDC payment,
+     retry with the PAYMENT-SIGNATURE header. Response 202 → { "orderId": "ord_…", "status": "paid", "status_url": "…" }
+4. Poll
+   - GET  https://iomarkets.app/v1/orders/<orderId>  every 3 s until "terminal": true
+     status: delivered (confirmation + signed receipt) | refunded (refund_txid + signed receipt) | refund_failed (contact support)
+
+## Guarantees
+- Money moves first, goods second: an order exists only after the facilitator settles your USDC payment on-chain.
+- If the operator/supplier fails, the full amount is refunded to the paying address on-chain automatically.
+- Every terminal order carries an ed25519-signed receipt over {order, amounts, payer, settlement txid, refund txid}.
+  Public key: c65e5bdaf5115c370f9ba76dcb4daaa310bb489c112126b4b2052d3cb103a0de — GET https://iomarkets.app/v1/pubkey.
+- Check one yourself, free, without trusting us or installing anything:
+   - POST https://iomarkets.app/v1/verify   with the receipt (or the whole order response) as the body
+     → signature, whether the signer is this server, and both txids confirmed against an Algorand indexer.
+     Add ?online=0 to skip the chain lookup. It verifies receipts from ANY server that uses the format.
+- Public ledger: GET https://iomarkets.app/v1/ledger (orders, delivered/refunded %, volume, by country).
+
+## No wallet? Hand the human a pay link
+- POST https://iomarkets.app/v1/links  { "type": "esim", "offerId": "<offerId>", "note": "Data for your Tokyo trip" }
+                          { "type": "topup", "offerId": "<offerId>", "recipient": { "phone": "+234…" }, "amount": 1000 }
+  → { "url": "https://iomarkets.app/l/pl_…", "indicative_price_usdc": "…", "share": { "x": "…" } }
+  The human opens the url, sees the exact price, and approves it in their own Pera wallet — the key never
+  leaves their wallet and you never hold one. An eSIM's activation QR appears on the page; a top-up link
+  can be paid by anyone (a "top up my phone" request) and credits only the number on the link.
+  Top-up links are single-use by default; eSIM links are reusable until expiry (max_uses, ttl_hours).
+- GET  https://iomarkets.app/v1/links/<linkId>          → state: open | paid | expired
+- POST https://iomarkets.app/v1/links/<linkId>/quote    → a fresh quote for that link, payable over x402 like any other
+
+## Earn: referral share, paid on-chain
+- Add "ref": "<your Algorand address>" to POST /v1/quote or POST /v1/links.
+- On every DELIVERED order you referred, you earn a share of our net margin (never of the price), sent to that
+  address in USDC on-chain, batched. Refunded orders and self-referrals earn nothing. The address must be
+  opted in to USDC. Terms and leaderboard: GET https://iomarkets.app/v1/referrals · your numbers: GET https://iomarkets.app/v1/referrals/<address>
+- Humans: https://iomarkets.app/earn
+
+## Proof of delivery, shareable
+- Every goods order has a public page at https://iomarkets.app/p/<settlement_txid> (also `proof_url` on /v1/ledger rows):
+  what was bought, the price, the delivery time, the on-chain settlement and a server-checked receipt signature.
+  It never shows the order id — that id is the capability that reads the deliverable. Keep it private.
+
+## Limits
+- Goods: max per order $50. International payments: max per payment $200, verified sender (partner KYC reference)
+  required once a payer's payouts exceed $100 in a UTC day. Max per payer per UTC day $200 overall. Sanctioned destinations refused.
+- International payments are executed by a licensed payout partner; we never hold or move fiat ourselves.
+- Quotes expire after 10 minutes and can be paid exactly once.
+
+## Errors
+- 400 invalid input · 403 quote unusable / limit reached / destination not supported · 404 unknown · 429 slow down · 502/503 supplier problem (no charge)

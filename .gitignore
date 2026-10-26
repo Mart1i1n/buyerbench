@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.DS_Store
+runs/
+generated/*
+!generated/tasks/
+results/*
+!results/all_final_results.jsonl.gz
+!results/final_results_clean.jsonl

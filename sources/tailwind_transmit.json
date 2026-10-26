@@ -1,0 +1,7 @@
+{
+  "url": "https://tailwindcss.com/plus/templates/transmit",
+  "error": "HTTP Error 401: Unauthorized",
+  "method": "GET",
+  "authenticated": false,
+  "paid": false
+}

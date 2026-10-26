@@ -1,0 +1,31 @@
+{
+  "id": 46153824534698,
+  "product_id": 8003089760426,
+  "title": "Desktop / 1 user",
+  "price": "69.00",
+  "sku": "946506_2275_1",
+  "position": 1,
+  "compare_at_price": "",
+  "fulfillment_service": "manual",
+  "inventory_management": null,
+  "option1": "Desktop",
+  "option2": "1 user",
+  "option3": null,
+  "created_at": "2024-07-24T06:19:50-04:00",
+  "updated_at": "2026-09-26T08:53:44-04:00",
+  "taxable": true,
+  "barcode": null,
+  "grams": 0,
+  "image_id": null,
+  "weight": 0.0,
+  "weight_unit": "lb",
+  "requires_shipping": false,
+  "quantity_rule": {
+    "min": 1,
+    "max": null,
+    "increment": 1
+  },
+  "price_currency": "USD",
+  "compare_at_price_currency": "",
+  "quantity_price_breaks": []
+}
